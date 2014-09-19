@@ -1,0 +1,4 @@
+<?php
+//Can be tls:// or ssl://
+$rcmail_config['autoselect_con_type'] = '';
+?>
