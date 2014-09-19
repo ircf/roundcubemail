@@ -22,7 +22,6 @@
 define('INSTALL_PATH', realpath(dirname(__FILE__) . '/..') . '/' );
 
 require_once INSTALL_PATH . 'program/include/clisetup.php';
-require_once INSTALL_PATH . 'installer/rcube_install.php';
 
 // get arguments
 $opts = rcube_utils::get_opt(array('v' => 'version', 'y' => 'accept'));
@@ -36,7 +35,7 @@ if (!$opts['version']) {
     $opts['version'] = RCMAIL_VERSION;
 }
 
-$RCI = rcube_install::get_instance();
+$RCI = rcmail_install::get_instance();
 $RCI->load_config();
 
 if ($RCI->configured) {
@@ -147,7 +146,7 @@ if ($RCI->configured) {
   // check file type detection
   if ($RCI->check_mime_detection()) {
     echo "WARNING: File type detection doesn't work properly!\n";
-    echo "Please check the 'mime_magic' config option or the finfo functions of PHP andrun this script again.\n";
+    echo "Please check the 'mime_magic' config option or the finfo functions of PHP and run this script again.\n";
   }
   if ($RCI->check_mime_extensions()) {
     echo "WARNING: Mimetype to file extension mapping doesn't work properly!\n";
@@ -158,7 +157,7 @@ if ($RCI->configured) {
   if ($RCI->config['db_dsnw']) {
     echo "Executing database schema update.\n";
     system("php " . INSTALL_PATH . "bin/updatedb.sh --package=roundcube --version=" . $opts['version']
-      . " --dir=" . INSTALL_PATH . DIRECTORY_SEPARATOR . "SQL", $res);
+      . " --dir=" . INSTALL_PATH . "SQL", $res);
 
     $success = !$res;
   }

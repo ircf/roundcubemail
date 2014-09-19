@@ -29,6 +29,7 @@ class Framework_Utils extends PHPUnit_Framework_TestCase
             array('email@domain.name', '.name is valid Top Level Domain name'),
             array('email@domain.co.jp', 'Dot in Top Level Domain name also considered valid (use co.jp as example here)'),
             array('firstname-lastname@domain.com', 'Dash in address field is valid'),
+            array('test@xn--e1aaa0cbbbcacac.xn--p1ai', 'IDNA domain'),
         );
     }
 
@@ -320,17 +321,49 @@ class Framework_Utils extends PHPUnit_Framework_TestCase
     }
 
     /**
-     * rcube:utils::normalize _string()
+     * rcube:utils::normalize_string()
      */
     function test_normalize_string()
     {
         $test = array(
-            '' => '',
+            ''        => '',
             'abc def' => 'abc def',
+            'ÇçäâàåæéêëèïîìÅÉöôòüûùÿøØáíóúñÑÁÂÀãÃÊËÈÍÎÏÓÔõÕÚÛÙýÝ' => 'ccaaaaaeeeeiiiaeooouuuyooaiounnaaaaaeeeiiioooouuuyy',
+            'ąáâäćçčéęëěíîłľĺńňóôöŕřśšşťţůúűüźžżýĄŚŻŹĆ' => 'aaaaccceeeeiilllnnooorrsssttuuuuzzzyaszzc',
+            'ß'  => 'ss',
+            'ae' => 'a',
+            'oe' => 'o',
+            'ue' => 'u',
         );
 
         foreach ($test as $input => $output) {
             $result = rcube_utils::normalize_string($input);
+            $this->assertSame($output, $result);
+        }
+    }
+
+    /**
+     * rcube:utils::is_absolute_path()
+     */
+    function test_is_absolute_path()
+    {
+        if (strtoupper(substr(PHP_OS, 0, 3)) == 'WIN') {
+            $test = array(
+                '' => false,
+                "C:\\" => true,
+                'some/path' => false,
+            );
+        }
+        else {
+            $test = array(
+                '' => false,
+                '/path' => true,
+                'some/path' => false,
+            );
+        }
+
+        foreach ($test as $input => $output) {
+            $result = rcube_utils::is_absolute_path($input);
             $this->assertSame($output, $result);
         }
     }

@@ -12,6 +12,20 @@
  * method hashPassword based on code from the phpLDAPadmin development team (http://phpldapadmin.sourceforge.net/).
  * method randomSalt based on code from the phpLDAPadmin development team (http://phpldapadmin.sourceforge.net/).
  *
+ * Copyright (C) 2005-2014, The Roundcube Dev Team
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see http://www.gnu.org/licenses/.
  */
 
 class rcube_ldap_password
@@ -130,15 +144,22 @@ class rcube_ldap_password
      */
     function search_userdn($rcmail)
     {
+        $binddn = $rcmail->config->get('password_ldap_searchDN');
+        $bindpw = $rcmail->config->get('password_ldap_searchPW');
+
         $ldapConfig = array (
-            'binddn'    => $rcmail->config->get('password_ldap_searchDN'),
-            'bindpw'    => $rcmail->config->get('password_ldap_searchPW'),
             'basedn'    => $rcmail->config->get('password_ldap_basedn'),
             'host'      => $rcmail->config->get('password_ldap_host'),
             'port'      => $rcmail->config->get('password_ldap_port'),
             'starttls'  => $rcmail->config->get('password_ldap_starttls'),
             'version'   => $rcmail->config->get('password_ldap_version'),
         );
+
+        // allow anonymous searches
+        if (!empty($binddn)) {
+            $ldapConfig['binddn'] = $binddn;
+            $ldapConfig['bindpw'] = $bindpw;
+        }
 
         $ldap = Net_LDAP2::connect($ldapConfig);
 
@@ -294,5 +315,4 @@ class rcube_ldap_password
 
         return $str;
     }
-
 }
