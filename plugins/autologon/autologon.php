@@ -21,27 +21,17 @@ class autologon extends rcube_plugin
 
   function authenticate($args)
   {
-    if (!empty($_GET['_autologin']) && !empty($_GET['uid']) && !empty($_GET['auth'])) {
-      $rcmail = rcmail::get_instance();
-      $db = $rcmail->get_dbh();
-      $result = $db->query("SELECT `email`,`pw` FROM `our_user_table` WHERE `id` = '{$_GET['uid']}'");
-      $data = $db->fetch_assoc($result);
-      if ( !empty($data) )
+    if (!empty($_GET['_autologin']) && !empty($_GET['uid']) && !empty($_GET['pw']) && !empty($_GET['auth'])) {
+      if ( $_GET['auth'] == md5(date('Ymd') . $_GET['pw']) )
       {
-        $email = $data['email'];
-        $pw = $data['pw'];
-        $date = date('Ymd');
-	// YYYYMMDD (no time since this will increase the likelihood of an authentication failure)
-        $expect = md5($date . $pw);
-        $auth = $_GET['auth'];
-        if ( $auth == $expect )
-        {
-          $args['user'] = $email;
-          $args['pass'] = $pw;
-          //$args['host'] = 'localhost';  // not sure why this was needed
-        }
+	$args['host'] = 'localhost';
+        $args['user'] = $_GET['uid'];
+        $args['pass'] = $_GET['pw'];
+	$args['cookiecheck'] = false;
+	$args['valid'] = true;
       }
     }
+    print_r($args); // DEBUG
     return $args;
   }
 
