@@ -31,7 +31,6 @@ class autologon extends rcube_plugin
 	$args['valid'] = true;
       }
     }
-    print_r($args); // DEBUG
     return $args;
   }
 
