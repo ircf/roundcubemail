@@ -8,6 +8,7 @@ plugins/*/config.inc.php
 plugins/rcsample
 plugins/plugin_manager
 plugins/ispconfig3_*
+plugins/markasjunk2
 
 # composer-related
 composer.json
