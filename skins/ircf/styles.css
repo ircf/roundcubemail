@@ -1368,6 +1368,7 @@ table.records-table {
 	border: 0;
 }
 
+.records-table thead th,
 .records-table thead td {
 	color: #69939e;
 	font-size: 11px;
