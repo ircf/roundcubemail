@@ -50,7 +50,8 @@
 <div id="filtersetmenu" class="popupmenu" aria-hidden="true">
   <h3 id="aria-label-setactions" class="voice"><roundcube:label name="managesieve.arialabelfiltersetactions" /></h3>
   <ul class="toolbarmenu" id="filtersetmenu-menu" role="menu" aria-labelledby="aria-label-setactions">
-    <li role="menuitem"><roundcube:button command="plugin.managesieve-setact" label="managesieve.enable" classAct="active" /></li>
+    <!-- Removed by IRCF on 2014-11-13 : filter group enabling/disabling breaks ispconfig .sieve file, see /etc/dovecot/dovecot.conf -->
+    <!-- <li role="menuitem"><roundcube:button command="plugin.managesieve-setact" label="managesieve.enable" classAct="active" /></li>-->
     <li role="menuitem"><roundcube:button command="plugin.managesieve-setdel" label="delete" classAct="active" /></li>
     <li role="menuitem" class="separator_above"><roundcube:button command="plugin.managesieve-setget" label="download" classAct="active" /></li>
     <roundcube:container name="filtersetoptions" id="filtersetmenu" />
