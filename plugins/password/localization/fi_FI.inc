@@ -30,4 +30,9 @@ $messages['passwordshort'] = 'Salasanassa täytyy olla vähintään $length merk
 $messages['passwordweak'] = 'Salasanan täytyy sisältää vähintään yksi numero ja yksi välimerkki.';
 $messages['passwordforbidden'] = 'Salasana sisältää virheellisiä merkkejä.';
 $messages['firstloginchange'] = 'Tämä on ensimmäinen kirjautumiskertasi. Vaihda salasanasi.';
-?>
+$messages['disablednotice'] = 'Järjestelmä on parhaillaan huoltotilassa, joten salasanaa ei voi vaihtaa juuri nyt. Pahoittelemme aiheutunutta vaivaa. Kaiken pitäisi olla pian käytettävissä normaaliin tapaan.';
+$messages['passwinhistory'] = 'Tämä salasana on jo ollut käytössä aikaisemmin.';
+$messages['samepasswd'] = 'Uuden salasanan pitää olla eri kuin vanha salasana.';
+$messages['passwdexpirewarning'] = 'Varoitus! Salasanasi vanhenee pian, vaihda se ennen $expirationdatetime.';
+$messages['passwdexpired'] = 'Salasanasi on vanhentunut ja se pitää vaihtaa nyt!';
+$messages['passwdconstraintviolation'] = 'Salasanan rajoitevirhe. Salasana on todennäköisesti liian heikko.';

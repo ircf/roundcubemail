@@ -4,16 +4,13 @@
  * New Mail Notifier plugin
  *
  * Supports three methods of notification:
- * 1. Basic - focus browser window and change favicon
- * 2. Sound - play wav file
- * 3. Desktop - display desktop notification (using webkitNotifications feature,
- *              supported by Chrome and Firefox with 'HTML5 Notifications' plugin)
+ * 1. Basic   - focus browser window and change favicon
+ * 2. Sound   - play wav file
+ * 3. Desktop - display desktop notification (using window.Notification API)
  *
- * @version @package_version@
  * @author Aleksander Machniak <alec@alec.pl>
  *
- *
- * Copyright (C) 2011, Kolab Systems AG
+ * Copyright (C) 2011-2016, Kolab Systems AG
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -69,7 +66,7 @@ class newmail_notifier extends rcube_plugin
 
                 if (!empty($this->opt)) {
                     // Get folders to skip checking for
-                    $exceptions = array('drafts_mbox', 'sent_mbox', 'trash_mbox');
+                    $exceptions = array('drafts_mbox', 'sent_mbox', 'trash_mbox', 'junk_mbox');
                     foreach ($exceptions as $folder) {
                         $folder = $this->rc->config->get($folder);
                         if (strlen($folder) && $folder != 'INBOX') {
@@ -161,7 +158,7 @@ class newmail_notifier extends rcube_plugin
         foreach (array('basic', 'desktop', 'sound') as $type) {
             $key = 'newmail_notifier_' . $type;
             if (!in_array($key, $dont_override)) {
-                $args['prefs'][$key] = rcube_utils::get_input_value('_'.$key, rcube_utils::INPUT_POST) ? true : false;
+                $args['prefs'][$key] = rcube_utils::get_input_value('_' . $key, rcube_utils::INPUT_POST) ? true : false;
             }
         }
 

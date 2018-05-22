@@ -1,6 +1,6 @@
 <?php
 
-/*
+/**
  +-----------------------------------------------------------------------+
  | This file is part of the Roundcube Webmail client                     |
  | Copyright (C) 2008-2014, The Roundcube Dev Team                       |
@@ -71,6 +71,7 @@ abstract class rcube_plugin
     protected $home;
     protected $urlbase;
     private $mytask;
+    private $loaded_config = array();
 
 
     /**
@@ -141,6 +142,12 @@ abstract class rcube_plugin
      */
     public function load_config($fname = 'config.inc.php')
     {
+        if (in_array($fname, $this->loaded_config)) {
+            return true;
+        }
+
+        $this->loaded_config[] = $fname;
+
         $fpath = $this->home.'/'.$fname;
         $rcube = rcube::get_instance();
 
@@ -192,62 +199,19 @@ abstract class rcube_plugin
      */
     public function add_texts($dir, $add2client = false)
     {
-        $domain = $this->ID;
-        $lang   = $_SESSION['language'];
-        $langs  = array_unique(array('en_US', $lang));
-        $locdir = slashify(realpath(slashify($this->home) . $dir));
-        $texts  = array();
-
-        // Language aliases used to find localization in similar lang, see below
-        $aliases = array(
-            'de_CH' => 'de_DE',
-            'es_AR' => 'es_ES',
-            'fa_AF' => 'fa_IR',
-            'nl_BE' => 'nl_NL',
-            'pt_BR' => 'pt_PT',
-            'zh_CN' => 'zh_TW',
-        );
-
-        // use buffering to handle empty lines/spaces after closing PHP tag
-        ob_start();
-
-        foreach ($langs as $lng) {
-            $fpath = $locdir . $lng . '.inc';
-            if (is_file($fpath) && is_readable($fpath)) {
-                include $fpath;
-                $texts = (array)$labels + (array)$messages + (array)$texts;
-            }
-            else if ($lng != 'en_US') {
-                // Find localization in similar language (#1488401)
-                $alias = null;
-                if (!empty($aliases[$lng])) {
-                    $alias = $aliases[$lng];
-                }
-                else if ($key = array_search($lng, $aliases)) {
-                    $alias = $key;
-                }
-
-                if (!empty($alias)) {
-                    $fpath = $locdir . $alias . '.inc';
-                    if (is_file($fpath) && is_readable($fpath)) {
-                        include $fpath;
-                        $texts = (array)$labels + (array)$messages + (array)$texts;
-                    }
-                }
-            }
-        }
-
-        ob_end_clean();
+        $rcube = rcube::get_instance();
+        $texts = $rcube->read_localization(realpath(slashify($this->home) . $dir));
 
         // prepend domain to text keys and add to the application texts repository
         if (!empty($texts)) {
-            $add = array();
+            $domain = $this->ID;
+            $add    = array();
+
             foreach ($texts as $key => $value) {
                 $add[$domain.'.'.$key] = $value;
             }
 
-            $rcube = rcube::get_instance();
-            $rcube->load_language($lang, $add);
+            $rcube->load_language($_SESSION['language'], $add);
 
             // add labels to client
             if ($add2client && method_exists($rcube->output, 'add_label')) {
@@ -257,6 +221,7 @@ abstract class rcube_plugin
                 else {
                     $js_labels = array_keys($add);
                 }
+
                 $rcube->output->add_label($js_labels);
             }
         }
@@ -351,7 +316,7 @@ abstract class rcube_plugin
      */
     public function include_stylesheet($fn)
     {
-        $this->api->include_stylesheet($this->resource_url($fn));
+        $this->api->include_stylesheet($this->resource_url($fn), $if_exists);
     }
 
     /**
@@ -415,7 +380,7 @@ abstract class rcube_plugin
         $rcube = rcube::get_instance();
         $skins = array_keys((array)$rcube->output->skins);
         if (empty($skins)) {
-            $skins = array($rcube->config->get('skin'));
+            $skins = (array) $rcube->config->get('skin');
         }
         foreach ($skins as $skin) {
             $skin_path = 'skins/' . $skin;

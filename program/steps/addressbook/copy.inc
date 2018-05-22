@@ -1,6 +1,6 @@
 <?php
 
-/*
+/**
  +-----------------------------------------------------------------------+
  | program/steps/addressbook/copy.inc                                    |
  |                                                                       |
@@ -115,14 +115,14 @@ foreach ($cids as $source => $cid) {
             $success = $plugin['result'];
         }
 
-        $errormsg = $plugin['message'] ? $plugin['message'] : 'copyerror';
+        $errormsg = $plugin['message'] ?: 'copyerror';
     }
 }
 
 if (!$success)
     $OUTPUT->show_message($errormsg, 'error');
 else
-    $OUTPUT->show_message('copysuccess', 'notice', array('nr' => $success));
+    $OUTPUT->show_message('copysuccess', 'confirmation', array('nr' => $success));
 
 // send response
 $OUTPUT->send();

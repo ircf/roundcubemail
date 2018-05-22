@@ -9,7 +9,7 @@
 
 .googie_edit_layer {
   background-color: #ffffff;
-  padding: 0 4px;
+  padding: 1px 3px;
   font-size: 9pt;
   font-family: monospace;
 }
@@ -115,4 +115,14 @@
   border-left: 1px solid #b1b1b1;
   border-right: 1px solid #555;
   border-bottom: 1px solid #555;
+}
+
+.googie_ok_button {
+  background: url(images/googiespell/ok.gif) no-repeat center center transparent;
+  width: 32px;
+  height: 16px;
+  cursor: pointer;
+  padding: 0 2px;
+  text-indent: -5000px;
+  border: 0;
 }

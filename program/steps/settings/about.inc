@@ -1,6 +1,6 @@
 <?php
 
-/*
+/**
  +-----------------------------------------------------------------------+
  | program/steps/settings/about.inc                                      |
  |                                                                       |
@@ -29,13 +29,12 @@ $OUTPUT->add_handler('pluginlist', 'rcmail_plugins_list');
 $OUTPUT->send('about');
 
 
-
 function rcmail_supportlink($attrib)
 {
     global $RCMAIL;
 
     if ($url = $RCMAIL->config->get('support_url')) {
-        $label = $attrib['label'] ? $attrib['label'] : 'support';
+        $label = $attrib['label'] ?: 'support';
         $attrib['href'] = $url;
 
         return html::a($attrib, $RCMAIL->gettext($label));
@@ -85,17 +84,17 @@ function rcmail_plugins_list($attrib)
     $table->add_header('source', $RCMAIL->gettext('source'));
 
     foreach ($plugin_info as $name => $data) {
-        $uri = $data['src_uri'] ? $data['src_uri'] : $data['uri'];
+        $uri = $data['src_uri'] ?: $data['uri'];
         if ($uri && stripos($uri, 'http') !== 0) {
             $uri = 'http://' . $uri;
         }
 
         $table->add_row();
-        $table->add('name', rcube::Q($data['name'] ? $data['name'] : $name));
+        $table->add('name', rcube::Q($data['name'] ?: $name));
         $table->add('version', rcube::Q($data['version']));
-        $table->add('license', $data['license_uri'] ? html::a(array('target' => '_blank', href=> rcube::Q($data['license_uri'])),
+        $table->add('license', $data['license_uri'] ? html::a(array('target' => '_blank', 'href' => rcube::Q($data['license_uri'])),
             rcube::Q($data['license'])) : $data['license']);
-        $table->add('source', $uri ? html::a(array('target' => '_blank', href=> rcube::Q($uri)),
+        $table->add('source', $uri ? html::a(array('target' => '_blank', 'href' => rcube::Q($uri)),
             rcube::Q($RCMAIL->gettext('download'))) : '');
     }
 

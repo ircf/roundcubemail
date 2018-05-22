@@ -1,7 +1,8 @@
 Roundcube Webmail 
 =================
-[roundcube.net](http://roundcube.net)
+[roundcube.net](https://roundcube.net)
 
+[![Build Status](https://api.travis-ci.org/roundcube/roundcubemail.svg?branch=master)](https://travis-ci.org/roundcube/roundcubemail)
 
 ATTENTION
 ---------
@@ -80,8 +81,8 @@ For more information visit [roundcube.net/contribute][contrib]
 
 CONTACT
 -------
-For any bug reports or feature requests please refer to the tracking system
-at [trac.roundcube.net][tracreport] or subscribe to our mailing list.
+For bug reports or feature requests please refer to the tracking system
+at [Github][githubissues] or subscribe to our mailing list.
 See [roundcube.net/support][support] for details.
 
 You're always welcome to send a message to the project admin:
@@ -95,7 +96,7 @@ hello(at)roundcube(dot)net
 [washtml]:      http://www.ubixis.com/washtml/
 [kmgerich]:     http://kmgerich.com/
 [gpl]:          http://www.gnu.org/licenses/
-[license]:      http://roundcube.net/license
-[contrib]:      http://roundcube.net/contribute
-[support]:      http://roundcube.net/support
-[tracreport]:   http://trac.roundcube.net/wiki/Howto_ReportIssues
+[license]:      https://roundcube.net/license
+[contrib]:      https://roundcube.net/contribute
+[support]:      https://roundcube.net/support
+[githubissues]: https://github.com/roundcube/roundcubemail/issues

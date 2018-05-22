@@ -59,7 +59,7 @@ function GoogieSpell(img_dir, server_url, has_dict)
     };
     this.lang_to_word = this.org_lang_to_word;
     this.langlist_codes = this.array_keys(this.lang_to_word);
-    this.show_change_lang_pic = true;
+    this.show_change_lang_pic = false; // roundcube mod.
     this.change_lang_pic_placement = 'right';
     this.report_state_change = true;
 
@@ -74,6 +74,7 @@ function GoogieSpell(img_dir, server_url, has_dict)
     this.lang_no_suggestions = "No suggestions";
     this.lang_learn_word = "Add to dictionary";
 
+    this.use_ok_pic = false; // added by roundcube
     this.show_spell_img = false; // roundcube mod.
     this.decoration = true;
     this.use_close_btn = false;
@@ -106,11 +107,11 @@ function GoogieSpell(img_dir, server_url, has_dict)
     this.cnt_errors_fixed = 0;
 
     // Set document's onclick to hide the language and error menu
-    $(document).bind('click', function(e) {
+    $(document).click(function(e) {
         var target = $(e.target);
-        if(target.attr('googie_action_btn') != '1' && ref.isLangWindowShown())
+        if (target.attr('googie_action_btn') != '1' && ref.isLangWindowShown())
             ref.hideLangWindow();
-        if(target.attr('googie_action_btn') != '1' && ref.isErrorWindowShown())
+        if (target.attr('googie_action_btn') != '1' && ref.isErrorWindowShown())
             ref.hideErrorWindow();
     });
 
@@ -138,8 +139,9 @@ this.decorateTextarea = function(id)
 
         this.checkSpellingState();
     }
-    else if (this.report_ta_not_found)
-        alert('Text area not found');
+    else if (this.report_ta_not_found) {
+        rcmail.alert_dialog('Text area not found');
+    }
 };
 
 //////
@@ -251,10 +253,12 @@ this.spellCheck = function(ignore)
 
     $.ajax({ type: 'POST', url: this.getUrl(), data: this.createXMLReq(req_text), dataType: 'text',
         error: function(o) {
-            if (ref.custom_ajax_error)
+            if (ref.custom_ajax_error) {
                 ref.custom_ajax_error(ref);
-            else
-                alert('An error was encountered on the server. Please try again later.');
+            }
+            else {
+                rcmail.alert_dialog('An error was encountered on the server. Please try again later.');
+            }
             if (ref.main_controller) {
                 $(ref.spell_span).remove();
                 ref.removeIndicator();
@@ -283,10 +287,12 @@ this.learnWord = function(word, id)
 
     $.ajax({ type: 'POST', url: this.getUrl(), data: req_text, dataType: 'text',
         error: function(o) {
-            if (ref.custom_ajax_error)
+            if (ref.custom_ajax_error) {
                 ref.custom_ajax_error(ref);
-            else
-                alert('An error was encountered on the server. Please try again later.');
+            }
+            else {
+                rcmail.alert_dialog('An error was encountered on the server. Please try again later.');
+            }
         },
         success: function(data) {
         }
@@ -312,7 +318,9 @@ this.prepare = function(ignore, no_indicator)
     this.ignore = ignore;
     this.hideLangWindow();
 
-    if ($(this.text_area).val() == '' || ignore) {
+    var area = $(this.text_area);
+
+    if (area.val() == '' || ignore) {
         if (!this.custom_no_spelling_error)
             this.flashNoSpellingErrorState();
         else
@@ -321,7 +329,7 @@ this.prepare = function(ignore, no_indicator)
         return;
     }
 
-    this.createEditLayer(this.text_area.offsetWidth, this.text_area.offsetHeight);
+    this.createEditLayer(area.width(), area.height());
     this.createErrorWindow();
     $('body').append(this.error_window);
 
@@ -329,9 +337,9 @@ this.prepare = function(ignore, no_indicator)
     catch (e) { }
 
     if (this.main_controller)
-        $(this.spell_span).unbind('click');
+        $(this.spell_span).off('click');
 
-    this.orginal_text = $(this.text_area).val();
+    this.orginal_text = area.val();
 };
 
 this.parseResult = function(r_text)
@@ -463,7 +471,7 @@ this.correctError = function(id, elm, l_elm, rm_pre_space)
 this.ignoreError = function(elm, id)
 {
     // @TODO: ignore all same words
-    $(elm).removeAttr('class').css('color', '').unbind();
+    $(elm).removeAttr('class').css('color', '').off();
     this.hideErrorWindow();
 };
 
@@ -503,7 +511,7 @@ this.showErrorWindow = function(elm, id)
             item = document.createElement('td'),
             dummy = document.createElement('span');
 
-            $(dummy).text(this.lang_learn_word);
+            $(dummy).text(this.lang_learn_word).addClass('googie_add_to_dict');
             $(item).attr('googie_action_btn', '1').css('cursor', 'default')
                 .mouseover(ref.item_onmouseover)
                 .mouseout(ref.item_onmouseout)
@@ -570,7 +578,7 @@ this.showErrorWindow = function(elm, id)
         var edit_row = document.createElement('tr'),
             edit = document.createElement('td'),
             edit_input = document.createElement('input'),
-            ok_pic = document.createElement('img'),
+            ok_pic = document.createElement('button'), // roundcube mod.
             edit_form = document.createElement('form');
 
         var onsub = function () {
@@ -590,10 +598,18 @@ this.showErrorWindow = function(elm, id)
           .val($(elm).text()).attr('googie_action_btn', '1');
         $(edit).css('cursor', 'default').attr('googie_action_btn', '1');
 
-        $(ok_pic).attr('src', this.img_dir + 'ok.gif')
-            .width(32).height(16)
-            .css({'cursor': 'pointer', 'margin-left': '2px', 'margin-right': '2px'})
-            .click(onsub);
+        // roundcube modified image use
+        if (this.use_ok_pic) {
+            $('<img>').attr('src', this.img_dir + 'ok.gif')
+                .width(32).height(16)
+                .css({cursor: 'pointer', 'margin-left': '2px', 'margin-right': '2px'})
+                .appendTo(ok_pic);
+        }
+        else {
+            $(ok_pic).text('OK');
+        }
+
+        $(ok_pic).addClass('mainaction save googie_ok_button').click(onsub);
 
         $(edit_form).attr('googie_action_btn', '1')
             .css({'margin': 0, 'padding': 0, 'cursor': 'default', 'white-space': 'nowrap'})
@@ -641,6 +657,9 @@ this.showErrorWindow = function(elm, id)
     table.appendChild(list);
     this.error_window.appendChild(table);
 
+    // roundcube plugin api hook
+    rcmail.triggerEvent('googiespell_create', {obj: this.error_window});
+
     // calculate and set position
     var height = $(this.error_window).height(),
         width = $(this.error_window).width(),
@@ -649,7 +668,10 @@ this.showErrorWindow = function(elm, id)
         top = pos.top + height + 20 < pageheight ? pos.top + 20 : pos.top - height,
         left = pos.left + width < pagewidth ? pos.left : pos.left - width;
 
-    $(this.error_window).css({'top': top+'px', 'left': left+'px'}).show();
+    if (left < 0) left = 0;
+    if (top < 0) top = 0;
+
+    $(this.error_window).css({'top': top+'px', 'left': left+'px', position: 'absolute'}).show();
 
     // Dummy for IE - dropdown bug fix
     if (document.all && !window.opera) {
@@ -674,10 +696,10 @@ this.createEditLayer = function(width, height)
 {
     this.edit_layer = document.createElement('div');
     $(this.edit_layer).addClass('googie_edit_layer').attr('id', 'googie_edit_layer')
-        .width('auto').height(height);
+        .width(width).height(height);
 
     if (this.text_area.nodeName.toLowerCase() != 'input' || $(this.text_area).val() == '') {
-        $(this.edit_layer).css('overflow', 'auto').height(height-4);
+        $(this.edit_layer).css('overflow', 'auto');
     } else {
         $(this.edit_layer).css('overflow', 'hidden');
     }
@@ -841,7 +863,7 @@ this.createLangWindow = function()
         this.lang_elms.push(item);
 
         $(item).attr('googieId', this.langlist_codes[i])
-            .bind('click', function(e) {
+            .click(function(e) {
                 ref.deHighlightCurSel();
                 ref.setCurrentLanguage($(this).attr('googieId'));
 
@@ -852,11 +874,11 @@ this.createLangWindow = function()
                 ref.highlightCurSel();
                 ref.hideLangWindow();
             })
-            .bind('mouseover', function(e) {
+            .mouseover(function(e) {
                 if (this.className != "googie_list_selected")
                     this.className = "googie_list_onhover";
             })
-            .bind('mouseout', function(e) {
+            .mouseout(function(e) {
                 if (this.className != "googie_list_selected")
                     this.className = "googie_list_onout";
             });
@@ -939,7 +961,7 @@ this.createChangeLangPic = function()
 
     $(switch_lan).addClass('googie_lang_3d_on')
         .append(img)
-        .bind('click', function(e) {
+        .click(function(e) {
             var elm = this.tagName.toLowerCase() == 'img' ? this.parentNode : this;
             if($(elm).hasClass('googie_lang_3d_click')) {
                 elm.className = 'googie_lang_3d_on';
@@ -1007,8 +1029,8 @@ this.resumeEditingState = function()
     var ref = this;
 
         $(this.switch_lan_pic).hide();
-        $(this.spell_span).empty().unbind().append(rsm)
-            .bind('click', function() { ref.resumeEditing() })
+        $(this.spell_span).empty().off().append(rsm)
+            .click(function() { ref.resumeEditing(); })
             .removeClass().addClass('googie_resume_editing');
     }
 
@@ -1030,9 +1052,9 @@ this.checkSpellingState = function(fire)
         ref = this;
 
     if (this.custom_spellcheck_starter)
-        $(span_chck).bind('click', function(e) { ref.custom_spellcheck_starter() });
+        $(span_chck).click(function(e) { ref.custom_spellcheck_starter(); });
     else {
-        $(span_chck).bind('click', function(e) { ref.spellCheck() });
+        $(span_chck).click(function(e) { ref.spellCheck(); });
     }
 
     if (this.main_controller) {
@@ -1088,9 +1110,9 @@ this.createButton = function(name, css_class, c_fn)
         spn_btn = document.createTextNode(name);
     }
 
-    $(btn).bind('click', c_fn)
-        .bind('mouseover', this.item_onmouseover)
-        .bind('mouseout', this.item_onmouseout);
+    $(btn).click(c_fn)
+        .mouseover(this.item_onmouseover)
+        .mouseout(this.item_onmouseout);
 
     btn.appendChild(spn_btn);
     btn_row.appendChild(btn);

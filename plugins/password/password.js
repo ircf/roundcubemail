@@ -16,6 +16,13 @@
  */
 
 window.rcmail && rcmail.addEventListener('init', function(evt) {
+    if (rcmail.env.password_disabled) {
+        $('#password-form input').prop('disabled', true);
+        // reload page after ca. 3 minutes
+        rcmail.reload(3 * 60 * 1000 - 2000);
+        return;
+    }
+
     // register command handler
     rcmail.register_command('plugin.password-save', function() {
         var input_curpasswd = rcube_find_object('_curpasswd'),
@@ -23,20 +30,28 @@ window.rcmail && rcmail.addEventListener('init', function(evt) {
             input_confpasswd = rcube_find_object('_confpasswd');
 
       if (input_curpasswd && input_curpasswd.value == '') {
-          alert(rcmail.gettext('nocurpassword', 'password'));
-          input_curpasswd.focus();
+          rcmail.alert_dialog(rcmail.get_label('nocurpassword', 'password'), function() {
+              input_curpasswd.focus();
+              return true;
+            });
       }
       else if (input_newpasswd && input_newpasswd.value == '') {
-          alert(rcmail.gettext('nopassword', 'password'));
-          input_newpasswd.focus();
+          rcmail.alert_dialog(rcmail.get_label('nopassword', 'password'), function() {
+              input_newpasswd.focus();
+              return true;
+            });
       }
       else if (input_confpasswd && input_confpasswd.value == '') {
-          alert(rcmail.gettext('nopassword', 'password'));
-          input_confpasswd.focus();
+          rcmail.alert_dialog(rcmail.get_label('nopassword', 'password'), function() {
+              input_confpasswd.focus();
+              return true;
+            });
       }
       else if (input_newpasswd && input_confpasswd && input_newpasswd.value != input_confpasswd.value) {
-          alert(rcmail.gettext('passwordinconsistency', 'password'));
-          input_newpasswd.focus();
+          rcmail.alert_dialog(rcmail.get_label('passwordinconsistency', 'password'), function() {
+              input_newpasswd.focus();
+              return true;
+            });
       }
       else {
           rcmail.gui_objects.passform.submit();

@@ -26,14 +26,15 @@
 
 class rcube_vpopmaild_password
 {
-    function save($curpass, $passwd)
+    function save($curpass, $passwd, $username)
     {
-        $rcmail = rcmail::get_instance();
-    //    include('Net/Socket.php');
+        $rcmail    = rcmail::get_instance();
         $vpopmaild = new Net_Socket();
+        $host      = $rcmail->config->get('password_vpopmaild_host');
+        $port      = $rcmail->config->get('password_vpopmaild_port');
 
-        if (PEAR::isError($vpopmaild->connect($rcmail->config->get('password_vpopmaild_host'),
-            $rcmail->config->get('password_vpopmaild_port'), null))) {
+        $result = $vpopmaild->connect($host, $port, null);
+        if (is_a($result, 'PEAR_Error')) {
             return PASSWORD_CONNECT_ERROR;
         }
 
@@ -45,7 +46,7 @@ class rcube_vpopmaild_password
             return PASSWORD_CONNECT_ERROR;
         }
 
-        $vpopmaild->writeLine("slogin ". $_SESSION['username'] . " " . $curpass);
+        $vpopmaild->writeLine("slogin ". $username . " " . $curpass);
         $result = $vpopmaild->readLine();
 
         if(!preg_match('/^\+OK/', $result) ) {
@@ -54,7 +55,7 @@ class rcube_vpopmaild_password
             return PASSWORD_ERROR;
         }
 
-        $vpopmaild->writeLine("mod_user ". $_SESSION['username']);
+        $vpopmaild->writeLine("mod_user ". $username);
         $vpopmaild->writeLine("clear_text_password ". $passwd);
         $vpopmaild->writeLine(".");
         $result = $vpopmaild->readLine();

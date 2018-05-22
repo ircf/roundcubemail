@@ -30,6 +30,7 @@ class Framework_Utils extends PHPUnit_Framework_TestCase
             array('email@domain.co.jp', 'Dot in Top Level Domain name also considered valid (use co.jp as example here)'),
             array('firstname-lastname@domain.com', 'Dash in address field is valid'),
             array('test@xn--e1aaa0cbbbcacac.xn--p1ai', 'IDNA domain'),
+            array('あいうえお@domain.com', 'Unicode char as address'),
         );
     }
 
@@ -48,7 +49,6 @@ class Framework_Utils extends PHPUnit_Framework_TestCase
             array('.email@domain.com', 'Leading dot in address is not allowed'),
             array('email.@domain.com', 'Trailing dot in address is not allowed'),
             array('email..email@domain.com', 'Multiple dots'),
-            array('あいうえお@domain.com', 'Unicode char as address'),
             array('email@domain.com (Joe Smith)', 'Text followed email is not allowed'),
             array('email@domain', 'Missing top level domain (.com/.net/.org/etc)'),
             array('email@-domain.com', 'Leading dash in front of domain is invalid'),
@@ -95,6 +95,8 @@ class Framework_Utils extends PHPUnit_Framework_TestCase
             array('::1'),
             array('::1.2.3.4'),
             array('2001:2d12:c4fe:5afe::1'),
+            array('2001::'),
+            array('2001::1'),
         );
     }
 
@@ -110,7 +112,10 @@ class Framework_Utils extends PHPUnit_Framework_TestCase
             array('1.1.1.1.1'),
             array('::1.2.3.260'),
             array('::1.0'),
+            array(':::1'),
+            array('2001:::1'),
             array('2001::c4fe:5afe::1'),
+            array(':c4fe:5afe:1'),
         );
     }
 
@@ -178,6 +183,7 @@ class Framework_Utils extends PHPUnit_Framework_TestCase
 
         $this->assertContains('#rcmbody table[class=w600]', $mod, 'Replace styles nested in @media block');
         $this->assertContains('#rcmbody {width:600px', $mod, 'Replace body selector nested in @media block');
+        $this->assertContains('#rcmbody {min-width:474px', $mod, 'Replace body selector nested in @media block (#5811)');
     }
 
     /**
@@ -197,8 +203,77 @@ class Framework_Utils extends PHPUnit_Framework_TestCase
         $mod = rcube_utils::mod_css_styles("left:exp/*  */ression( alert(&#039;xss3&#039;) )", 'rcmbody');
         $this->assertEquals("/* evil! */", $mod, "Don't allow encoding quirks");
 
-        $mod = rcube_utils::mod_css_styles("background:\\0075\\0072\\006c( javascript:alert(&#039;xss&#039;) )", 'rcmbody');
+        $mod = rcube_utils::mod_css_styles("background:\\0075\\0072\\00006c( javascript:alert(&#039;xss&#039;) )", 'rcmbody');
         $this->assertEquals("/* evil! */", $mod, "Don't allow encoding quirks (2)");
+
+        $mod = rcube_utils::mod_css_styles("background: \\75 \\72 \\6C ('/images/img.png')", 'rcmbody');
+        $this->assertEquals("/* evil! */", $mod, "Don't allow encoding quirks (3)");
+
+        $mod = rcube_utils::mod_css_styles("background: u\\r\\l('/images/img.png')", 'rcmbody');
+        $this->assertEquals("/* evil! */", $mod, "Don't allow encoding quirks (4)");
+
+        // position: fixed (#5264)
+        $mod = rcube_utils::mod_css_styles(".test { position: fixed; }", 'rcmbody');
+        $this->assertEquals("#rcmbody .test { position: absolute; }", $mod, "Replace position:fixed with position:absolute (0)");
+
+        $mod = rcube_utils::mod_css_styles(".test { position:\nfixed; }", 'rcmbody');
+        $this->assertEquals("#rcmbody .test { position: absolute; }", $mod, "Replace position:fixed with position:absolute (1)");
+
+        $mod = rcube_utils::mod_css_styles(".test { position:/**/fixed; }", 'rcmbody');
+        $this->assertEquals("#rcmbody .test { position: absolute; }", $mod, "Replace position:fixed with position:absolute (2)");
+
+        // allow data URIs with images (#5580)
+        $mod = rcube_utils::mod_css_styles("body { background-image: url(data:image/png;base64,123); }", 'rcmbody');
+        $this->assertContains("#rcmbody { background-image: url(data:image/png;base64,123);", $mod, "Data URIs in url() allowed [1]");
+        $mod = rcube_utils::mod_css_styles("body { background-image: url(data:image/png;base64,123); }", 'rcmbody', true);
+        $this->assertContains("#rcmbody { background-image: url(data:image/png;base64,123);", $mod, "Data URIs in url() allowed [2]");
+    }
+
+    /**
+     * rcube_utils::mod_css_styles()'s prefix argument handling
+     */
+    function test_mod_css_styles_prefix()
+    {
+        $css = '
+            .one { font-size: 10pt; }
+            .three.four { font-weight: bold; }
+            #id1 { color: red; }
+            #id2.class:focus { color: white; }
+            .five:not(.test), { background: transparent; }
+            div .six { position: absolute; }
+            p > i { font-size: 120%; }
+            div#some { color: yellow; }
+            @media screen and (max-width: 699px) and (min-width: 520px) {
+                li a.button { padding-left: 30px; }
+            }
+        ';
+        $mod = rcube_utils::mod_css_styles($css, 'rc', true, 'test');
+
+        $this->assertContains('#rc .testone', $mod);
+        $this->assertContains('#rc .testthree.testfour', $mod);
+        $this->assertContains('#rc #testid1', $mod);
+        $this->assertContains('#rc #testid2.testclass:focus', $mod);
+        $this->assertContains('#rc .testfive:not(.testtest)', $mod);
+        $this->assertContains('#rc div .testsix', $mod);
+        $this->assertContains('#rc p > i ', $mod);
+        $this->assertContains('#rc div#testsome', $mod);
+        $this->assertContains('#rc li a.testbutton', $mod);
+    }
+
+    function test_xss_entity_decode()
+    {
+        $mod = rcube_utils::xss_entity_decode("&lt;img/src=x onerror=alert(1)// </b>");
+        $this->assertNotContains('<img', $mod, "Strip (encoded) tags from style node");
+
+        $mod = rcube_utils::xss_entity_decode('#foo:after{content:"\003Cimg/src=x onerror=alert(2)>";}');
+        $this->assertNotContains('<img', $mod, "Strip (encoded) tags from content property");
+
+        $mod = rcube_utils::xss_entity_decode("background: u\\r\\00006c('/images/img.png')");
+        $this->assertContains("url(", $mod, "Escape sequences resolving");
+
+        // #5747
+        $mod = rcube_utils::xss_entity_decode('<!-- #foo { content:css; } -->');
+        $this->assertContains('#foo', $mod, "Strip HTML comments from content, but not the content");
     }
 
     /**
@@ -241,7 +316,7 @@ class Framework_Utils extends PHPUnit_Framework_TestCase
         );
 
         foreach ($input as $idx => $value) {
-            $this->assertFalse(get_boolean($value), "Invalid result for $idx test item");
+            $this->assertFalse(rcube_utils::get_boolean($value), "Invalid result for $idx test item");
         }
 
         $input = array(
@@ -249,7 +324,7 @@ class Framework_Utils extends PHPUnit_Framework_TestCase
         );
 
         foreach ($input as $idx => $value) {
-            $this->assertTrue(get_boolean($value), "Invalid result for $idx test item");
+            $this->assertTrue(rcube_utils::get_boolean($value), "Invalid result for $idx test item");
         }
     }
 
@@ -275,17 +350,23 @@ class Framework_Utils extends PHPUnit_Framework_TestCase
      */
     function test_strtotime()
     {
+        // this test depends on system timezone if not set
+        date_default_timezone_set('UTC');
+
         $test = array(
             '1' => 1,
             '' => 0,
-            '2013-04-22' => 1366581600,
-            '2013/04/22' => 1366581600,
-            '2013.04.22' => 1366581600,
-            '22-04-2013' => 1366581600,
-            '22/04/2013' => 1366581600,
-            '22.04.2013' => 1366581600,
-            '22.4.2013'  => 1366581600,
-            '20130422'   => 1366581600,
+            'abc-555' => 0,
+            '2013-04-22' => 1366588800,
+            '2013/04/22' => 1366588800,
+            '2013.04.22' => 1366588800,
+            '22-04-2013' => 1366588800,
+            '22/04/2013' => 1366588800,
+            '22.04.2013' => 1366588800,
+            '22.4.2013'  => 1366588800,
+            '20130422'   => 1366588800,
+            '2013/06/21 12:00:00 UTC' => 1371816000,
+            '2013/06/21 12:00:00 Europe/Berlin' => 1371808800,
         );
 
         foreach ($test as $datetime => $ts) {
@@ -311,12 +392,90 @@ class Framework_Utils extends PHPUnit_Framework_TestCase
             '20130422'   => '2013-04-22',
             '1900-10-10' => '1900-10-10',
             '01-01-1900' => '1900-01-01',
-            '01/30/1960' => '1960-01-30'
+            '01/30/1960' => '1960-01-30',
+            '1960.12.11 01:02:00' => '1960-12-11',
         );
 
         foreach ($test as $datetime => $ts) {
             $result = rcube_utils::anytodatetime($datetime);
-            $this->assertSame($ts, $result ? $result->format('Y-m-d') : '', "Error parsing date: $datetime");
+            $this->assertSame($ts, $result ? $result->format('Y-m-d') : false, "Error parsing date: $datetime");
+        }
+
+        $test = array(
+            '12/11/2013 01:02:00' => '2013-11-12 01:02:00',
+            '1960.12.11 01:02:00' => '1960-12-11 01:02:00',
+        );
+
+        foreach ($test as $datetime => $ts) {
+            $result = rcube_utils::anytodatetime($datetime);
+            $this->assertSame($ts, $result ? $result->format('Y-m-d H:i:s') : false, "Error parsing date: $datetime");
+        }
+
+        $test = array(
+            'Sun, 4 Mar 2018 03:32:08 +0300 (MSK)' => '2018-03-04 03:32:08 +0300',
+        );
+
+        foreach ($test as $datetime => $ts) {
+            $result = rcube_utils::anytodatetime($datetime);
+            $this->assertSame($ts, $result ? $result->format('Y-m-d H:i:s O') : false, "Error parsing date: $datetime");
+        }
+    }
+
+    /**
+     * rcube:utils::anytodatetime()
+     */
+    function test_anytodatetime_timezone()
+    {
+        $tz = new DateTimeZone('Europe/Helsinki');
+        $test = array(
+            'Jan 1st 2014 +0800' => '2013-12-31 18:00',  // result in target timezone
+            'Jan 1st 14 45:42'   => '2014-01-01 00:00',  // force fallback to rcube_utils::strtotime()
+            'Jan 1st 2014 UK'    => '2014-01-01 00:00',
+            '1520587800'         => '2018-03-09 11:30',  // unix timestamp conversion
+            'Invalid date'       => false,
+        );
+
+        foreach ($test as $datetime => $ts) {
+            $result = rcube_utils::anytodatetime($datetime, $tz);
+            if ($result) $result->setTimezone($tz);  // move to target timezone for comparison
+            $this->assertSame($ts, $result ? $result->format('Y-m-d H:i') : false, "Error parsing date: $datetime");
+        }
+    }
+
+    /**
+     * rcube:utils::format_datestr()
+     */
+    function test_format_datestr()
+    {
+        $test = array(
+            array('abc-555', 'abc', 'abc-555'),
+            array('2013-04-22', 'Y-m-d', '2013-04-22'),
+            array('22/04/2013', 'd/m/Y', '2013-04-22'),
+            array('4.22.2013', 'm.d.Y', '2013-04-22'),
+        );
+
+        foreach ($test as $data) {
+            $result = rcube_utils::format_datestr($data[0], $data[1]);
+            $this->assertSame($data[2], $result, "Error formatting date: " . $data[0]);
+        }
+    }
+
+    /**
+     * rcube:utils::tokenize_string()
+     */
+    function test_tokenize_string()
+    {
+        $test = array(
+            ''        => array(),
+            'abc d'   => array('abc'),
+            'abc de'  => array('abc','de'),
+            'äàé;êöü-xyz' => array('äàé','êöü','xyz'),
+            '日期格式' => array('日期格式'),
+        );
+
+        foreach ($test as $input => $output) {
+            $result = rcube_utils::tokenize_string($input);
+            $this->assertSame($output, $result);
         }
     }
 
@@ -330,15 +489,45 @@ class Framework_Utils extends PHPUnit_Framework_TestCase
             'abc def' => 'abc def',
             'ÇçäâàåæéêëèïîìÅÉöôòüûùÿøØáíóúñÑÁÂÀãÃÊËÈÍÎÏÓÔõÕÚÛÙýÝ' => 'ccaaaaaeeeeiiiaeooouuuyooaiounnaaaaaeeeiiioooouuuyy',
             'ąáâäćçčéęëěíîłľĺńňóôöŕřśšşťţůúűüźžżýĄŚŻŹĆ' => 'aaaaccceeeeiilllnnooorrsssttuuuuzzzyaszzc',
-            'ß'  => 'ss',
-            'ae' => 'a',
-            'oe' => 'o',
-            'ue' => 'u',
+            'ßs'  => 'sss',
+            'Xae' => 'xa',
+            'Xoe' => 'xo',
+            'Xue' => 'xu',
+            '项目' => '项目',
         );
+
+        // this test fails on PHP 5.3.3
+        if (PHP_VERSION_ID > 50303) {
+            $test['ß']  = '';
+            $test['日'] = '';
+        }
 
         foreach ($test as $input => $output) {
             $result = rcube_utils::normalize_string($input);
-            $this->assertSame($output, $result);
+            $this->assertSame($output, $result, "Error normalizing '$input'");
+        }
+    }
+
+    /**
+     * rcube:utils::words_match()
+     */
+    function test_words_match()
+    {
+        $test = array(
+            array('', 'test', false),
+            array('test', 'test', true),
+            array('test', 'none', false),
+            array('test', 'test xyz', false),
+            array('test xyz', 'test xyz', true),
+            array('this is test', 'test', true),
+            // try some binary content
+            array('this is test ' . base64_decode('R0lGODlhDwAPAIAAAMDAwAAAACH5BAEAAAAALAAAAAAPAA8AQAINhI+py+0Po5y02otnAQA7'), 'test', true),
+            array('this is test ' . base64_decode('R0lGODlhDwAPAIAAAMDAwAAAACH5BAEAAAAALAAAAAAPAA8AQAINhI+py+0Po5y02otnAQA7'), 'none', false),
+        );
+
+        foreach ($test as $idx => $params) {
+            $result = rcube_utils::words_match($params[0], $params[1]);
+            $this->assertSame($params[2], $result, "words_match() at index $idx");
         }
     }
 
@@ -366,5 +555,83 @@ class Framework_Utils extends PHPUnit_Framework_TestCase
             $result = rcube_utils::is_absolute_path($input);
             $this->assertSame($output, $result);
         }
+    }
+
+    /**
+     * rcube:utils::random_bytes()
+     */
+    function test_random_bytes()
+    {
+        $this->assertRegexp('/^[a-zA-Z0-9]{15}$/', rcube_utils::random_bytes(15));
+        $this->assertSame(15, strlen(rcube_utils::random_bytes(15, true)));
+        $this->assertSame(1, strlen(rcube_utils::random_bytes(1)));
+        $this->assertSame(0, strlen(rcube_utils::random_bytes(0)));
+        $this->assertSame(0, strlen(rcube_utils::random_bytes(-1)));
+    }
+
+    /**
+     * Test-Cases for IDN to ASCII and IDN to UTF-8
+     */
+    function data_idn_convert()
+    {
+
+        /*
+         * Check https://en.wikipedia.org/wiki/List_of_Internet_top-level_domains#Internationalized_brand_top-level_domains
+         * and https://github.com/true/php-punycode/blob/master/tests/PunycodeTest.php for more Test-Data
+         */
+
+        return array(
+            array('test@vermögensberater', 'test@xn--vermgensberater-ctb'),
+            array('test@vermögensberatung', 'test@xn--vermgensberatung-pwb'),
+            array('test@グーグル', 'test@xn--qcka1pmc'),
+            array('test@谷歌', 'test@xn--flw351e'),
+            array('test@中信', 'test@xn--fiq64b'),
+            array('test@рф.ru', 'test@xn--p1ai.ru'),
+            array('test@δοκιμή.gr', 'test@xn--jxalpdlp.gr'),
+            array('test@gwóźdź.pl', 'test@xn--gwd-hna98db.pl'),
+            array('рф.ru@рф.ru', 'рф.ru@xn--p1ai.ru'),
+            array('vermögensberater', 'xn--vermgensberater-ctb'),
+            array('vermögensberatung', 'xn--vermgensberatung-pwb'),
+            array('グーグル', 'xn--qcka1pmc'),
+            array('谷歌', 'xn--flw351e'),
+            array('中信', 'xn--fiq64b'),
+            array('рф.ru', 'xn--p1ai.ru'),
+            array('δοκιμή.gr', 'xn--jxalpdlp.gr'),
+            array('gwóźdź.pl', 'xn--gwd-hna98db.pl'),
+        );
+
+    }
+
+    /**
+     * Test idn_to_ascii
+     *
+     * @param string $decoded Decoded email address
+     * @param string $encoded Encoded email address
+     * @dataProvider data_idn_convert
+     */
+    function test_idn_to_ascii($decoded, $encoded)
+    {
+        $this->assertEquals(rcube_utils::idn_to_ascii($decoded), $encoded);
+    }
+
+    /**
+     * Test idn_to_utf8
+     *
+     * @param string $decoded Decoded email address
+     * @param string $encoded Encoded email address
+     * @dataProvider data_idn_convert
+     */
+    function test_idn_to_utf8($decoded, $encoded)
+    {
+        $this->assertEquals(rcube_utils::idn_to_utf8($encoded), $decoded);
+    }
+
+    /**
+     * Test idn_to_ascii with non-domain input (#6224)
+     */
+    function test_idn_to_ascii_special()
+    {
+        $this->assertEquals(rcube_utils::idn_to_ascii('H.S'), 'H.S');
+        $this->assertEquals(rcube_utils::idn_to_ascii('d.-h.lastname'), 'd.-h.lastname');
     }
 }

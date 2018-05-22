@@ -3,9 +3,7 @@
 /**
  * Folders Access Control Lists Management (RFC4314, RFC2086)
  *
- * @version @package_version@
  * @author Aleksander Machniak <alec@alec.pl>
- *
  *
  * Copyright (C) 2011-2012, Kolab Systems AG
  *
@@ -25,7 +23,7 @@
 
 class acl extends rcube_plugin
 {
-    public $task = 'settings|addressbook|calendar';
+    public $task = 'settings';
 
     private $rc;
     private $supported = null;
@@ -42,9 +40,7 @@ class acl extends rcube_plugin
 
         // Register hooks
         $this->add_hook('folder_form', array($this, 'folder_form'));
-        // kolab_addressbook plugin
-        $this->add_hook('addressbook_form', array($this, 'folder_form'));
-        $this->add_hook('calendar_form_kolab', array($this, 'folder_form'));
+
         // Plugin actions
         $this->register_action('plugin.acl', array($this, 'acl_actions'));
         $this->register_action('plugin.acl-autocomplete', array($this, 'acl_autocomplete'));
@@ -114,14 +110,16 @@ class acl extends rcube_plugin
             }
 
             if ($this->rc->config->get('acl_groups')) {
-                $prefix = $this->rc->config->get('acl_group_prefix');
-                $result = $this->ldap->list_groups($search, $mode);
+                $prefix      = $this->rc->config->get('acl_group_prefix');
+                $group_field = $this->rc->config->get('acl_group_field', 'name');
+                $result      = $this->ldap->list_groups($search, $mode);
 
                 foreach ($result as $record) {
-                    $group = $record['name'];
+                    $group    = $record['name'];
+                    $group_id = is_array($record[$group_field]) ? $record[$group_field][0] : $record[$group_field];
 
                     if ($group) {
-                        $users[] = array('name' => ($prefix ? $prefix : '')  . $group, 'display' => $group);
+                        $users[] = array('name' => ($prefix ?: '') . $group_id, 'display' => $group, 'type' => 'group');
                         $keys[]  = $group;
                     }
                 }
@@ -177,7 +175,7 @@ class acl extends rcube_plugin
         $this->rc->output->add_label('save', 'cancel');
         $this->include_script('acl.js');
         $this->rc->output->include_script('list.js');
-        $this->include_stylesheet($this->local_skin_path().'/acl.css');
+        $this->include_stylesheet($this->local_skin_path() . '/acl.css');
 
         // add Info fieldset if it doesn't exist
         if (!isset($args['form']['props']['fieldsets']['info']))
@@ -249,6 +247,11 @@ class acl extends rcube_plugin
         // Get supported rights
         $supported = $this->rights_supported();
 
+        // give plugins the opportunity to adjust this list
+        $data = $this->rc->plugins->exec_hook('acl_rights_supported',
+            array('rights' => $supported, 'folder' => $this->mbox, 'labels' => array()));
+        $supported = $data['rights'];
+
         // depending on server capability either use 'te' or 'd' for deleting msgs
         $deleteright = implode(array_intersect(str_split('ted'), $supported));
 
@@ -279,18 +282,22 @@ class acl extends rcube_plugin
             'other' => preg_replace('/[lrswi'.$deleteright.']/', '', implode($supported)),
         );
 
-        foreach ($items as $key => $val) {
+        // give plugins the opportunity to adjust this list
+        $data = $this->rc->plugins->exec_hook('acl_rights_simple',
+            array('rights' => $items, 'folder' => $this->mbox, 'labels' => array(), 'titles' => array()));
+
+        foreach ($data['rights'] as $key => $val) {
             $id = "acl$key";
             $ul .= html::tag('li', null,
                 $input->show('', array(
                     'name' => "acl[$val]", 'value' => $val, 'id' => $id))
-                . html::label(array('for' => $id, 'title' => $this->gettext('longacl'.$key)),
-                    $this->gettext('acl'.$key)));
+                . html::label(array('for' => $id, 'title' => $data['titles'][$key] ?: $this->gettext('longacl'.$key)),
+                    $data['labels'][$key] ?: $this->gettext('acl'.$key)));
         }
 
         $out .= "\n" . html::tag('ul', $attrib, $ul, html::$common_attrib);
 
-        $this->rc->output->set_env('acl_items', $items);
+        $this->rc->output->set_env('acl_items', $data['rights']);
 
         return $out;
     }
@@ -309,8 +316,10 @@ class acl extends rcube_plugin
 
         $textfield = new html_inputfield($attrib);
 
-        $fields['user'] = html::label(array('for' => $attrib['id']), $this->gettext('username'))
-            . ' ' . $textfield->show();
+        $fields['user'] = html::div('input-group',
+            html::span('input-group-prepend',
+                html::label(array('for' => $attrib['id'], 'class' => 'input-group-text'), $this->gettext('username')))
+            . ' ' . $textfield->show());
 
         // Add special entries
         if (!empty($this->specials)) {
@@ -377,6 +386,11 @@ class acl extends rcube_plugin
         // Get supported rights and build column names
         $supported = $this->rights_supported();
 
+        // give plugins the opportunity to adjust this list
+        $data = $this->rc->plugins->exec_hook('acl_rights_supported',
+            array('rights' => $supported, 'folder' => $this->mbox, 'labels' => array()));
+        $supported = $data['rights'];
+
         // depending on server capability either use 'te' or 'd' for deleting msgs
         $deleteright = implode(array_intersect(str_split('ted'), $supported));
 
@@ -396,6 +410,11 @@ class acl extends rcube_plugin
                 'delete' => $deleteright,
                 'other' => preg_replace('/[lrswi'.$deleteright.']/', '', implode($supported)),
             );
+
+            // give plugins the opportunity to adjust this list
+            $data = $this->rc->plugins->exec_hook('acl_rights_simple',
+                array('rights' => $items, 'folder' => $this->mbox, 'labels' => array()));
+            $items = $data['rights'];
         }
 
         // Create the table
@@ -405,7 +424,7 @@ class acl extends rcube_plugin
         // Create table header
         $table->add_header('user', $this->gettext('identifier'));
         foreach (array_keys($items) as $key) {
-            $label = $this->gettext('shortacl'.$key);
+            $label = $data['labels'][$key] ?: $this->gettext('shortacl'.$key);
             $table->add_header(array('class' => 'acl'.$key, 'title' => $label), $label);
         }
 
@@ -433,7 +452,7 @@ class acl extends rcube_plugin
                     case 1: $class = 'partial'; break;
                     default: $class = 'disabled'; break;
                 }
-                $table->add('acl' . $key . ' ' . $class, '');
+                $table->add('acl' . $key . ' ' . $class, '<span></span>');
             }
 
             $js_table[$userid] = implode($userrights);
@@ -452,10 +471,10 @@ class acl extends rcube_plugin
      */
     private function action_save()
     {
-        $mbox  = trim(rcube_utils::get_input_value('_mbox', rcube_utils::INPUT_GPC, true)); // UTF7-IMAP
-        $user  = trim(rcube_utils::get_input_value('_user', rcube_utils::INPUT_GPC));
-        $acl   = trim(rcube_utils::get_input_value('_acl', rcube_utils::INPUT_GPC));
-        $oldid = trim(rcube_utils::get_input_value('_old', rcube_utils::INPUT_GPC));
+        $mbox  = trim(rcube_utils::get_input_value('_mbox', rcube_utils::INPUT_POST, true)); // UTF7-IMAP
+        $user  = trim(rcube_utils::get_input_value('_user', rcube_utils::INPUT_POST));
+        $acl   = trim(rcube_utils::get_input_value('_acl', rcube_utils::INPUT_POST));
+        $oldid = trim(rcube_utils::get_input_value('_old', rcube_utils::INPUT_POST));
 
         $acl    = array_intersect(str_split($acl), $this->rights_supported());
         $users  = $oldid ? array($user) : explode(',', $user);
@@ -475,6 +494,13 @@ class acl extends rcube_plugin
                 if (!strpos($user, '@') && ($realm = $this->get_realm())) {
                     $user .= '@' . rcube_utils::idn_to_ascii(preg_replace('/^@/', '', $realm));
                 }
+
+                // Make sure it's valid email address to prevent from "disappearing folder"
+                // issue in Cyrus IMAP e.g. when the acl user identifier contains spaces inside.
+                if (strpos($user, '@') && !rcube_utils::check_email($user, false)) {
+                    $user = null;
+                }
+
                 $username = $user;
             }
 
@@ -508,8 +534,8 @@ class acl extends rcube_plugin
      */
     private function action_delete()
     {
-        $mbox = trim(rcube_utils::get_input_value('_mbox', rcube_utils::INPUT_GPC, true)); //UTF7-IMAP
-        $user = trim(rcube_utils::get_input_value('_user', rcube_utils::INPUT_GPC));
+        $mbox = trim(rcube_utils::get_input_value('_mbox', rcube_utils::INPUT_POST, true)); //UTF7-IMAP
+        $user = trim(rcube_utils::get_input_value('_user', rcube_utils::INPUT_POST));
 
         $user = explode(',', $user);
 
@@ -542,7 +568,7 @@ class acl extends rcube_plugin
 
         $this->mbox = trim(rcube_utils::get_input_value('_mbox', rcube_utils::INPUT_GPC, true)); // UTF7-IMAP
         $advanced   = trim(rcube_utils::get_input_value('_mode', rcube_utils::INPUT_GPC));
-        $advanced   = $advanced == 'advanced' ? true : false;
+        $advanced   = $advanced == 'advanced';
 
         // Save state in user preferences
         $this->rc->user->save_prefs(array('acl_advanced_mode' => $advanced));
@@ -592,7 +618,7 @@ class acl extends rcube_plugin
      * @param array $acl1 ACL rights array (or string)
      * @param array $acl2 ACL rights array (or string)
      *
-     * @param int Comparision result, 2 - full match, 1 - partial match, 0 - no match
+     * @param int Comparison result, 2 - full match, 1 - partial match, 0 - no match
      */
     function acl_compare($acl1, $acl2)
     {
@@ -718,7 +744,11 @@ class acl extends rcube_plugin
         $config['fieldmap']['uid']  = $uid_field;
 
         // search in UID and name fields
-        $config['search_fields']   = array_values($config['fieldmap']);
+        // $name_field can be in a form of <field>:<modifier> (#1490591)
+        $name_field = preg_replace('/:.*$/', '', $name_field);
+        $search     = array_unique(array($name_field, $uid_field));
+
+        $config['search_fields']   = $search;
         $config['required_fields'] = array($uid_field);
 
         // set search filter

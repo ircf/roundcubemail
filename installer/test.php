@@ -154,7 +154,7 @@ else if ($db_working && $_POST['updatedb']) {
 
 // test database
 if ($db_working) {
-    $db_read = $DB->query("SELECT count(*) FROM {$RCI->config['db_prefix']}users");
+    $db_read = $DB->query("SELECT count(*) FROM " . $DB->quote_identifier($RCI->config['db_prefix'] . 'users'));
     if ($DB->is_error()) {
         $RCI->fail('DB Schema', "Database not initialized");
         echo '<p><input type="submit" name="initdb" value="Initialize database" /></p>';
@@ -178,17 +178,19 @@ if ($db_working) {
 if ($db_working) {
     // write test
     $insert_id = md5(uniqid());
-    $db_write = $DB->query("INSERT INTO {$RCI->config['db_prefix']}session (sess_id, created, ip, vars) VALUES (?, ".$DB->now().", '127.0.0.1', 'foo')", $insert_id);
+    $db_write = $DB->query("INSERT INTO " . $DB->quote_identifier($RCI->config['db_prefix'] . 'session')
+        . " (`sess_id`, `changed`, `ip`, `vars`) VALUES (?, ".$DB->now().", '127.0.0.1', 'foo')", $insert_id);
 
     if ($db_write) {
       $RCI->pass('DB Write');
-      $DB->query("DELETE FROM {$RCI->config['db_prefix']}session WHERE sess_id=?", $insert_id);
+      $DB->query("DELETE FROM " . $DB->quote_identifier($RCI->config['db_prefix'] . 'session')
+        . " WHERE `sess_id` = ?", $insert_id);
     }
     else {
       $RCI->fail('DB Write', $RCI->get_error());
     }
     echo '<br />';
-    
+
     // check timezone settings
     $tz_db = 'SELECT ' . $DB->unixtimestamp($DB->now()) . ' AS tz_db';
     $tz_db = $DB->query($tz_db);
@@ -238,41 +240,49 @@ else {
   echo "<br/>";
 }
 
-?>
+$user = $RCI->getprop('smtp_user', '(none)');
+$pass = $RCI->getprop('smtp_pass', '(none)');
 
+if ($user == '%u') {
+    $user_field = new html_inputfield(array('name' => '_smtp_user', 'id' => 'smtp_user'));
+    $user = $user_field->show($_POST['_smtp_user']);
+}
+if ($pass == '%p') {
+    $pass_field = new html_passwordfield(array('name' => '_smtp_pass', 'id' => 'smtp_pass'));
+    $pass = $pass_field->show();
+}
+
+?>
 
 <h3>Test SMTP config</h3>
 
 <p>
-Server: <?php echo rcube_parse_host($RCI->getprop('smtp_server', 'PHP mail()')); ?><br />
-Port: <?php echo $RCI->getprop('smtp_port'); ?><br />
-
-<?php
-
-if ($RCI->getprop('smtp_server')) {
-  $user = $RCI->getprop('smtp_user', '(none)');
-  $pass = $RCI->getprop('smtp_pass', '(none)');
-  
-  if ($user == '%u') {
-    $user_field = new html_inputfield(array('name' => '_smtp_user'));
-    $user = $user_field->show($_POST['_smtp_user']);
-  }
-  if ($pass == '%p') {
-    $pass_field = new html_passwordfield(array('name' => '_smtp_pass'));
-    $pass = $pass_field->show();
-  }
-  
-  echo "User: $user<br />";
-  echo "Password: $pass<br />";
-}
-
-$from_field = new html_inputfield(array('name' => '_from', 'id' => 'sendmailfrom'));
-$to_field = new html_inputfield(array('name' => '_to', 'id' => 'sendmailto'));
-
-?>
+<table>
+<tbody>
+  <tr>
+    <td><label for="smtp_server">Server</label></td>
+    <td><?php echo rcube_utils::parse_host($RCI->getprop('smtp_server', 'localhost')); ?></td>
+  </tr>
+  <tr>
+    <td><label for="smtp_port">Port</label></td>
+    <td><?php echo $RCI->getprop('smtp_port'); ?></td>
+  </tr>
+  <tr>
+    <td><label for="smtp_user">Username</label></td>
+    <td><?php echo $user; ?></td>
+  </tr>
+  <tr>
+    <td><label for="smtp_pass">Password</label></td>
+    <td><?php echo $pass; ?></td>
+  </tr>
+</tbody>
+</table>
 </p>
 
 <?php
+
+$from_field = new html_inputfield(array('name' => '_from', 'id' => 'sendmailfrom'));
+$to_field   = new html_inputfield(array('name' => '_to', 'id' => 'sendmailto'));
 
 if (isset($_POST['sendmail'])) {
 
@@ -291,42 +301,27 @@ if (isset($_POST['sendmail'])) {
     );
 
     $body = 'This is a test to confirm that Roundcube can send email.';
-    $smtp_response = array();
 
     // send mail using configured SMTP server
-    if ($RCI->getprop('smtp_server')) {
-      $CONFIG = $RCI->config;
+    $CONFIG = $RCI->config;
 
-      if (!empty($_POST['_smtp_user'])) {
-        $CONFIG['smtp_user'] = $_POST['_smtp_user'];
-      }
-      if (!empty($_POST['_smtp_pass'])) {
-        $CONFIG['smtp_pass'] = $_POST['_smtp_pass'];
-      }
-
-      $mail_object  = new Mail_mime();
-      $send_headers = $mail_object->headers($headers);
-
-      $SMTP = new rcube_smtp();
-      $SMTP->connect(rcube_parse_host($RCI->getprop('smtp_server')),
-        $RCI->getprop('smtp_port'), $CONFIG['smtp_user'], $CONFIG['smtp_pass']);
-
-      $status = $SMTP->send_mail($headers['From'], $headers['To'],
-          ($foo = $mail_object->txtHeaders($send_headers)), $body);
-
-      $smtp_response = $SMTP->get_response();
+    if (!empty($_POST['_smtp_user'])) {
+      $CONFIG['smtp_user'] = $_POST['_smtp_user'];
     }
-    else {    // use mail()
-      $header_str = 'From: ' . $headers['From'];
-      
-      if (ini_get('safe_mode'))
-        $status = mail($headers['To'], $headers['Subject'], $body, $header_str);
-      else
-        $status = mail($headers['To'], $headers['Subject'], $body, $header_str, '-f'.$headers['From']);
-      
-      if (!$status)
-        $smtp_response[] = 'Mail delivery with mail() failed. Check your error logs for details';
+    if (!empty($_POST['_smtp_pass'])) {
+      $CONFIG['smtp_pass'] = $_POST['_smtp_pass'];
     }
+
+    $mail_object  = new Mail_mime();
+    $send_headers = $mail_object->headers($headers);
+    $head         = $mail_object->txtHeaders($send_headers);
+
+    $SMTP = new rcube_smtp();
+    $SMTP->connect(rcube_utils::parse_host($RCI->getprop('smtp_server')),
+      $RCI->getprop('smtp_port'), $CONFIG['smtp_user'], $CONFIG['smtp_pass']);
+
+    $status        = $SMTP->send_mail($headers['From'], $headers['To'], $head, $body);
+    $smtp_response = $SMTP->get_response();
 
     if ($status) {
         $RCI->pass('SMTP send');
@@ -338,7 +333,7 @@ if (isset($_POST['sendmail'])) {
   else {
     $RCI->fail('SMTP send', 'Invalid sender or recipient');
   }
-  
+
   echo '</p>';
 }
 
@@ -403,7 +398,7 @@ $pass_field = new html_passwordfield(array('name' => '_pass', 'id' => 'imappass'
 
 if (isset($_POST['imaptest']) && !empty($_POST['_host']) && !empty($_POST['_user'])) {
 
-  echo '<p>Connecting to ' . Q($_POST['_host']) . '...<br />';
+  echo '<p>Connecting to ' . rcube::Q($_POST['_host']) . '...<br />';
 
   $imap_host = trim($_POST['_host']);
   $imap_port = $RCI->getprop('default_port');
@@ -425,6 +420,7 @@ if (isset($_POST['imaptest']) && !empty($_POST['_host']) && !empty($_POST['_user
   $imap->set_options(array(
     'auth_type' => $RCI->getprop('imap_auth_type'),
     'debug'     => $RCI->getprop('imap_debug'),
+    'socket_options' => $RCI->getprop('imap_conn_options'),
   ));
 
   if ($imap->connect($imap_host, $imap_user, $_POST['_pass'], $imap_port, $imap_ssl)) {

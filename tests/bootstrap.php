@@ -22,9 +22,9 @@
 if (php_sapi_name() != 'cli')
   die("Not in shell mode (php-cli)");
 
-if (!defined('INSTALL_PATH')) define('INSTALL_PATH', realpath(dirname(__FILE__) . '/..') . '/' );
+if (!defined('INSTALL_PATH')) define('INSTALL_PATH', realpath(__DIR__ . '/..') . '/' );
 
-define('TESTS_DIR', dirname(__FILE__) . '/');
+define('TESTS_DIR', __DIR__ . '/');
 
 if (@is_dir(TESTS_DIR . 'config')) {
     define('RCUBE_CONFIG_DIR', TESTS_DIR . 'config');
@@ -32,7 +32,7 @@ if (@is_dir(TESTS_DIR . 'config')) {
 
 require_once(INSTALL_PATH . 'program/include/iniset.php');
 
-rcmail::get_instance('test')->config->set('devel_mode', false);
+rcmail::get_instance(0, 'test')->config->set('devel_mode', false);
 
 // Extend include path so some plugin test won't fail
 $include_path = ini_get('include_path') . PATH_SEPARATOR . TESTS_DIR . '..';

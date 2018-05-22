@@ -1,6 +1,6 @@
 <?php
 
-/*
+/**
  +-----------------------------------------------------------------------+
  | This file is part of the Roundcube Webmail client                     |
  | Copyright (C) 2006-2013, The Roundcube Dev Team                       |
@@ -27,10 +27,10 @@
  */
 class rcube_result_set implements Iterator, ArrayAccess
 {
-    public $count = 0;
-    public $first = 0;
+    public $count      = 0;
+    public $first      = 0;
     public $searchonly = false;
-    public $records = array();
+    public $records    = array();
 
     private $current = 0;
 
@@ -115,5 +115,4 @@ class rcube_result_set implements Iterator, ArrayAccess
     {
         return isset($this->records[$this->current]);
     }
-
 }

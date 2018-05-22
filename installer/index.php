@@ -1,11 +1,11 @@
 <?php
 
-/*
+/**
  +-------------------------------------------------------------------------+
  | Roundcube Webmail setup tool                                            |
- | Version 1.1-git                                                         |
+ | Version 1.4-git                                                         |
  |                                                                         |
- | Copyright (C) 2009-2014, The Roundcube Dev Team                         |
+ | Copyright (C) 2009-2017, The Roundcube Dev Team                         |
  |                                                                         |
  | This program is free software: you can redistribute it and/or modify    |
  | it under the terms of the GNU General Public License (with exceptions   |
@@ -36,27 +36,11 @@
  +-------------------------------------------------------------------------+
 */
 
-ini_set('error_reporting', E_ALL &~ (E_NOTICE | E_STRICT));
 ini_set('display_errors', 1);
 
-define('INSTALL_PATH', realpath(dirname(__FILE__) . '/../').'/');
-define('RCUBE_INSTALL_PATH', INSTALL_PATH);
-define('RCUBE_CONFIG_DIR', INSTALL_PATH . 'config/');
+define('INSTALL_PATH', realpath(__DIR__ . '/../').'/');
 
-$include_path  = INSTALL_PATH . 'program/lib' . PATH_SEPARATOR;
-$include_path .= INSTALL_PATH . 'program/include' . PATH_SEPARATOR;
-$include_path .= ini_get('include_path');
-
-set_include_path($include_path);
-
-// include composer autoloader (if available)
-if (@file_exists(INSTALL_PATH . 'vendor/autoload.php')) {
-    require INSTALL_PATH . 'vendor/autoload.php';
-}
-
-require_once 'Roundcube/bootstrap.php';
-// deprecated aliases (to be removed)
-require_once 'bc.php';
+require INSTALL_PATH . 'program/include/iniset.php';
 
 if (function_exists('session_start'))
   session_start();
@@ -66,7 +50,13 @@ $RCI->load_config();
 
 if (isset($_GET['_getconfig'])) {
   $filename = 'config.inc.php';
-  if (!empty($_SESSION['config'])) {
+  if (!empty($_SESSION['config']) && $_GET['_getconfig'] == 2) {
+    $path = sys_get_temp_dir() . DIRECTORY_SEPARATOR . $filename;
+    @unlink($path);
+    file_put_contents($path, $_SESSION['config']);
+    exit;
+  }
+  else if (!empty($_SESSION['config'])) {
     header('Content-type: text/plain');
     header('Content-Disposition: attachment; filename="'.$filename.'"');
     echo $_SESSION['config'];
@@ -116,7 +106,7 @@ if ($RCI->configured && empty($_REQUEST['_step'])) {
 </div>
 
 <div id="topnav">
-  <a href="http://trac.roundcube.net/wiki/Howto_Install">How-to Wiki</a>
+  <a href="https://github.com/roundcube/roundcubemail/wiki/Installation">How-to Wiki</a>
 </div>
 
 <div id="content">
@@ -158,7 +148,7 @@ if ($RCI->configured && empty($_REQUEST['_step'])) {
 
   foreach (array('Check environment', 'Create config', 'Test config') as $i => $item) {
     $j = $i + 1;
-    $link = ($RCI->step >= $j || $RCI->configured) ? '<a href="./index.php?_step='.$j.'">' . Q($item) . '</a>' : Q($item);
+    $link = ($RCI->step >= $j || $RCI->configured) ? '<a href="./index.php?_step='.$j.'">' . rcube::Q($item) . '</a>' : rcube::Q($item);
     printf('<li class="step%d%s">%s</li>', $j+1, $RCI->step > $j ? ' passed' : ($RCI->step == $j ? ' current' : ''), $link);
   }
 ?>

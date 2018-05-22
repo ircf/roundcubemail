@@ -4,7 +4,7 @@
  * @licstart  The following is the entire license notice for the
  * JavaScript code in this file.
  *
- * Copyright (c) 2013-2014, The Roundcube Dev Team
+ * Copyright (c) 2013-2018, The Roundcube Dev Team
  *
  * The JavaScript code in this page is free software: you can redistribute it
  * and/or modify it under the terms of the GNU General Public License
@@ -43,10 +43,12 @@ window.rcmail && rcmail.addEventListener('init', function(evt) {
             link.html('').append(span);
         }
 
-        span.text(rcmail.gettext('zipdownload.download'));
+        link.attr('aria-haspopup', 'true');
+
+        span.text(rcmail.get_label('zipdownload.download'));
         rcmail.env.download_link = link;
     });
-  });
+});
 
 
 function rcmail_zipdownload(mode)
@@ -54,14 +56,22 @@ function rcmail_zipdownload(mode)
     // default .eml download of single message
     if (mode == 'eml') {
         var uid = rcmail.get_single_uid();
-        rcmail.goto_url('viewsource', {_uid: uid, _mbox: rcmail.get_message_mailbox(uid), _save: 1});
+        rcmail.goto_url('viewsource', rcmail.params_from_uid(uid, {_save: 1}), false, true);
         return;
     }
 
     // multi-message download, use hidden form to POST selection
     if (rcmail.message_list && rcmail.message_list.get_selection().length > 1) {
-        var inputs = [], form = $('#zipdownload-form'),
-            post = rcmail.selection_post_data();
+        var inputs = [],
+            post = rcmail.selection_post_data(),
+            id = 'zipdownload-' + new Date().getTime(),
+            iframe = $('<iframe>').attr({name: id, style: 'display:none'}),
+            form = $('<form>').attr({
+                    target: id,
+                    style: 'display: none',
+                    method: 'post',
+                    action: '?_task=mail&_action=plugin.zipdownload.messages'
+                });
 
         post._mode = mode;
         post._token = rcmail.env.request_token;
@@ -76,15 +86,8 @@ function rcmail_zipdownload(mode)
             }
         });
 
-        if (!form.length)
-            form = $('<form>').attr({
-                    style: 'display: none',
-                    method: 'POST',
-                    action: '?_task=mail&_action=plugin.zipdownload.messages'
-                })
-                .appendTo('body');
-
-        form.html('').append(inputs).submit();
+        iframe.appendTo(document.body);
+        form.append(inputs).appendTo(document.body).submit();
     }
 }
 
