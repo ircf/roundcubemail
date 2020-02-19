@@ -6,7 +6,7 @@
  * @licstart  The following is the entire license notice for the
  * JavaScript code in this file.
  *
- * Copyright (c) 2006-2014, The Roundcube Dev Team
+ * Copyright (c) The Roundcube Dev Team
  *
  * The JavaScript code in this page is free software: you can
  * redistribute it and/or modify it under the terms of the GNU
@@ -39,23 +39,26 @@ function rcube_text_editor(config, id)
     abs_url = location.href.replace(/[?#].*$/, '').replace(/\/$/, ''),
     conf = {
       selector: '#' + ($('#' + id).is('.mce_editor') ? id : 'fake-editor-id'),
-      cache_suffix: 's=4050800',
+      cache_suffix: 's=4080200',
       theme: 'modern',
       language: config.lang,
-      content_css: rcmail.assets_path('program/resources/tinymce/content.css'),
+      content_css: rcmail.assets_path(config.content_css),
       menubar: false,
       statusbar: false,
       toolbar_items_size: 'small',
       extended_valid_elements: 'font[face|size|color|style],span[id|class|align|style]',
       fontsize_formats: '8pt 9pt 10pt 11pt 12pt 14pt 18pt 24pt 36pt',
-      valid_children: '+body[style]',
+      // Allow style tag, have to be allowed inside body/div/blockquote (#7088)
+      valid_children: '+body[style],+blockquote[style],+div[style]',
       relative_urls: false,
       remove_script_host: false,
       convert_urls: false, // #1486944
       image_description: false,
       paste_webkit_style: "color font-size font-family",
       paste_data_images: true,
-      browser_spellcheck: true
+      browser_spellcheck: true,
+      anchor_bottom: false,
+      anchor_top: false
     };
 
   // register spellchecker for plain text editor
@@ -67,12 +70,15 @@ function rcube_text_editor(config, id)
     }
   }
 
-  // secure spellchecker requests with Roundcube token
   // Note: must be registered only once (#1490311)
   if (!tinymce.registered_request_token) {
     tinymce.registered_request_token = true;
     tinymce.util.XHR.on('beforeSend', function(e) {
+      // secure spellchecker requests with Roundcube token
       e.xhr.setRequestHeader('X-Roundcube-Request', rcmail.env.request_token);
+      // A hacky way of setting spellchecker language (there's no API for this in Tiny)
+      if (e.settings && e.settings.data)
+        e.settings.data = e.settings.data.replace(/^(method=[a-zA-Z]+&lang=)([^&]+)/, '$1' + rcmail.env.spell_lang);
     });
   }
 
@@ -129,7 +135,7 @@ function rcube_text_editor(config, id)
     $.extend(conf, window.rcmail_editor_settings);
 
   conf.setup = function(ed) {
-    ed.on('init', function(ed) { ref.init_callback(ed); });
+    ed.on('init', function() { ref.init_callback(ed); });
     // add handler for spellcheck button state update
     ed.on('SpellcheckStart SpellcheckEnd', function(args) {
       ref.spellcheck_active = args.type == 'spellcheckstart';
@@ -146,9 +152,15 @@ function rcube_text_editor(config, id)
         return false;
       }
     });
+    ed.on('focus blur', function(e) {
+      $(ed.getContainer()).toggleClass('focused');
+    });
+
+    if (conf.setup_callback)
+      conf.setup_callback(ed);
   };
 
-  rcmail.triggerEvent('editor-init', {config: conf, ref: ref});
+  rcmail.triggerEvent('editor-init', {config: conf, ref: ref, id: id});
 
   // textarea identifier
   this.id = id;
@@ -158,53 +170,52 @@ function rcube_text_editor(config, id)
   tinymce.init(conf);
 
   // react to real individual tinyMCE editor init
-  this.init_callback = function(event)
+  this.init_callback = function(editor)
   {
-    this.editor = event.target;
+    this.editor = editor;
 
-    rcmail.triggerEvent('editor-load', {config: conf, ref: ref});
+    if (rcmail.env.action == 'compose') {
+      var area = $('#' + this.id),
+        height = $('div.mce-toolbar-grp', area.parent()).first().height();
 
-    if (rcmail.env.action != 'compose') {
-      return;
-    }
+      // the editor might be still not fully loaded, making the editing area
+      // inaccessible, wait and try again (#1490310)
+      if (height > 200 || height > area.height()) {
+        return setTimeout(function () { ref.init_callback(editor); }, 300);
+      }
 
-    var area = $('#' + this.id),
-      height = $('div.mce-toolbar-grp:first', area.parent()).height();
+      var css = {},
+        elem = rcube_find_object('_from'),
+        fe = rcmail.env.compose_focus_elem;
 
-    // the editor might be still not fully loaded, making the editing area
-    // inaccessible, wait and try again (#1490310)
-    if (height > 200 || height > area.height()) {
-      return setTimeout(function () { ref.init_callback(event); }, 300);
-    }
+      if (rcmail.env.default_font)
+        css['font-family'] = rcmail.env.default_font;
 
-    var css = {},
-      elem = rcube_find_object('_from'),
-      fe = rcmail.env.compose_focus_elem;
+      if (rcmail.env.default_font_size)
+        css['font-size'] = rcmail.env.default_font_size;
 
-    if (rcmail.env.default_font)
-      css['font-family'] = rcmail.env.default_font;
+      if (css['font-family'] || css['font-size'])
+        $(this.editor.getBody()).css(css);
 
-    if (rcmail.env.default_font_size)
-      css['font-size'] = rcmail.env.default_font_size;
+      if (elem && elem.type == 'select-one') {
+        // insert signature (only for the first time)
+        if (!rcmail.env.identities_initialized)
+          rcmail.change_identity(elem);
 
-    if (css['font-family'] || css['font-size'])
-      $(this.editor.getBody()).css(css);
-
-    if (elem && elem.type == 'select-one') {
-      // insert signature (only for the first time)
-      if (!rcmail.env.identities_initialized)
-        rcmail.change_identity(elem);
-
-      // Focus previously focused element
-      if (fe && fe.id != this.id && fe.nodeName != 'BODY') {
-        window.focus(); // for WebKit (#1486674)
-        fe.focus();
-        rcmail.env.compose_focus_elem = null;
+        // Focus previously focused element
+        if (fe && fe.id != this.id && fe.nodeName != 'BODY') {
+          window.focus(); // for WebKit (#1486674)
+          fe.focus();
+          rcmail.env.compose_focus_elem = null;
+        }
       }
     }
 
+    rcmail.triggerEvent('editor-load', {config: conf, ref: ref});
+
     // set tabIndex and set focus to element that was focused before
-    ref.tabindex(fe && fe.id == ref.id);
+    ref.tabindex(ref.force_focus || (fe && fe.id == ref.id));
+
     // Trigger resize (needed for proper editor resizing in some browsers)
     $(window).resize();
   };
@@ -214,7 +225,6 @@ function rcube_text_editor(config, id)
   {
     if (rcmail.env.task == 'mail' && this.editor) {
       var textarea = this.editor.getElement(),
-        body = this.editor.getBody(),
         node = this.editor.getContentAreaContainer().childNodes[0];
 
       if (textarea && node)
@@ -240,11 +250,18 @@ function rcube_text_editor(config, id)
 
       // ContentEditable reset fixes invisible cursor issue in Firefox < 25
       if (bw.mz && bw.vendver < 25)
-        $(body).prop('contenteditable', false).prop('contenteditable', true);
-
-      if (focus)
-        body.focus();
+        $(this.editor.getBody()).prop('contenteditable', false).prop('contenteditable', true);
     }
+
+    if (focus)
+      this.focus();
+  };
+
+  // focus the editor
+  this.focus = function()
+  {
+    $(this.editor || ('#' + this.id)).focus();
+    this.force_focus = false;
   };
 
   // switch html/plain mode
@@ -275,16 +292,9 @@ function rcube_text_editor(config, id)
         if (is_sig)
           data = data.replace(sig_mark, '<div id="_rc_sig">' + signature.html + '</div>');
 
+        ref.force_focus = true;
         input.val(data);
         tinymce.execCommand('mceAddEditor', false, ref.id);
-
-        if (ref.editor) {
-          var body = $(ref.editor.getBody());
-          // #1486593
-          ref.tabindex(true);
-          // put cursor on start of the compose body
-          ref.editor.selection.setCursorLocation(body.children().first().get(0));
-        }
       };
 
       // convert to html
@@ -399,12 +409,7 @@ function rcube_text_editor(config, id)
   // get selected (spellchecker) language
   this.get_language = function()
   {
-    if (this.editor) {
-      return this.editor.settings.spellchecker_language || rcmail.env.spell_lang;
-    }
-    else if (this.spellchecker) {
-      return GOOGIE_CUR_LANG;
-    }
+    return rcmail.env.spell_lang;
   };
 
   // set language for spellchecking
@@ -413,11 +418,14 @@ function rcube_text_editor(config, id)
     var ed = this.editor;
 
     if (ed) {
+      // TODO: this has no effect in recent Tiny versions
       ed.settings.spellchecker_language = lang;
     }
     if (ed = this.spellchecker) {
       ed.setCurrentLanguage(lang);
     }
+
+    rcmail.env.spell_lang = lang;
   };
 
   // replace selection with text snippet
@@ -449,7 +457,7 @@ function rcube_text_editor(config, id)
     }
     // replace selection in compose textarea
     else if (ed = rcube_find_object(this.id)) {
-      var selection = $(ed).is(':focus') ? rcmail.get_input_selection(ed) : {start: 0, end: 0},
+      var selection = rcmail.get_input_selection(ed),
         value = ed.value,
         pre = value.substring(0, selection.start),
         end = value.substring(selection.end, value.length);
@@ -508,7 +516,7 @@ function rcube_text_editor(config, id)
     }
     // get selected text from compose textarea
     else if (ed = rcube_find_object(this.id)) {
-      if (args.selection && $(ed).is(':focus')) {
+      if (args.selection) {
         text = rcmail.get_input_selection(ed).text;
       }
 
@@ -648,20 +656,30 @@ function rcube_text_editor(config, id)
   // image selector
   this.file_browser_callback = function(field_name, url, type)
   {
-    var i, elem, cancel, dialog, fn, list = [];
+    var i, button, elem, cancel, dialog, fn, hint, list = [],
+      form = $('.upload-form').clone();
 
     // open image selector dialog
-    dialog = this.editor.windowManager.open({
+    this.editor.windowManager.open({
       title: rcmail.get_label('select' + type),
       width: 500,
-      height: 300,
-      html: '<div id="image-selector-list"><ul></ul></div>'
-        + '<div id="image-selector-form"><div id="image-upload-button" class="mce-widget mce-btn" role="button" tabindex="0"></div></div>',
+      html: '<div id="image-selector" class="image-selector file-upload"><ul id="image-selector-list" class="attachmentslist"></ul></div>',
       buttons: [{text: 'Cancel', onclick: function() { ref.file_browser_close(); }}]
     });
 
     rcmail.env.file_browser_field = field_name;
     rcmail.env.file_browser_type = type;
+
+    dialog = $('#image-selector');
+
+    if (!form.length)
+      form = this.file_upload_form(rcmail.gui_objects.uploadform);
+    else
+      form.find('button,a.button').slice(1).remove(); // need only the first button
+
+    button = dialog.prepend(form).find('button,a.button')
+      .text(rcmail.get_label('add' + type))
+      .focus();
 
     // fill images list with available images
     for (i in rcmail.env.attachments) {
@@ -670,49 +688,50 @@ function rcube_text_editor(config, id)
       }
     }
 
-    if (list.length) {
-      $('#image-selector-list > ul').append(list).find('li:first').focus();
-    }
+    cancel = dialog.parent().parent().find('button').last().parent();
 
-    // add hint about max file size (in dialog footer)
-    $('div.mce-abs-end', dialog.getEl()).append($('<div class="hint">')
-      .text($('div.hint', rcmail.gui_objects.uploadform).text()));
+    // Add custom Tab key handlers, tabindex does not work
+    list = $('#image-selector-list').append(list).on('keydown', 'li', function(e) {
+        if (e.which == 9) {
+          if (rcube_event.get_modifier(e) == SHIFT_KEY) {
+            if (!$(this).prev().focus().length) {
+              button.focus();
+            }
+          }
+          else if (!$(this).next().focus().length) {
+            cancel.focus();
+          }
 
-    // init upload button
-    elem = $('#image-upload-button').append($('<span>').text(rcmail.get_label('add' + type)));
-    cancel = elem.parents('.mce-panel').find('button:last').parent();
+          return false;
+        }
+      });
 
-    // we need custom Tab key handlers, until we find out why
-    // tabindex do not work here as expected
-    elem.keydown(function(e) {
-      if (e.which == 9) {
-        // on Tab + Shift focus first file
-        if (rcube_event.get_modifier(e) == SHIFT_KEY)
-          $('#image-selector-list li:last').focus();
-        // on Tab focus Cancel button
-        else
+    button.keydown(function(e) {
+      if (e.which == 9) { // Tab
+        if (rcube_event.get_modifier(e) == SHIFT_KEY || !list.find('li').first().focus().length) {
           cancel.focus();
+        }
 
         return false;
       }
+
+      if (e.which == 13) { // Enter
+        this.click();
+      }
     });
+
     cancel.keydown(function(e) {
       if (e.which == 9) {
-        // on Tab + Shift focus upload button
-        if (rcube_event.get_modifier(e) == SHIFT_KEY)
-          elem.focus();
-        else
-          $('#image-selector-list li:first').focus();
+        if (rcube_event.get_modifier(e) != SHIFT_KEY || !list.find('li').last().focus().length) {
+          button.focus();
+        }
 
         return false;
       }
     });
 
-    // enable (smart) upload button
-    this.hack_file_input(elem, rcmail.gui_objects.uploadform);
-
     // enable drag-n-drop area
-    if ((window.XMLHttpRequest && XMLHttpRequest.prototype && XMLHttpRequest.prototype.sendAsBinary) || window.FormData) {
+    if (window.FormData) {
       if (!rcmail.env.filedrop) {
         rcmail.env.filedrop = {};
       }
@@ -720,7 +739,7 @@ function rcube_text_editor(config, id)
         rcmail.env.old_file_drop = rcmail.gui_objects.filedrop;
       }
 
-      rcmail.gui_objects.filedrop = $('#image-selector-form');
+      rcmail.gui_objects.filedrop = $('#image-selector');
       rcmail.gui_objects.filedrop.addClass('droptarget')
         .on('dragover dragleave', function(e) {
           e.preventDefault();
@@ -731,12 +750,12 @@ function rcube_text_editor(config, id)
     }
 
     // register handler for successful file upload
-    if (!rcmail.env.file_dialog_event) {
-      rcmail.env.file_dialog_event = true;
+    if (!rcmail.env['file_dialog_event_' + type]) {
+      rcmail.env['file_dialog_event+' + type] = true;
       rcmail.addEventListener('fileuploaded', function(attr) {
         var elem;
         if (elem = ref.file_browser_entry(attr.name, attr.attachment)) {
-          $('#image-selector-list > ul').prepend(elem);
+          list.prepend(elem);
           elem.focus();
         }
       });
@@ -781,7 +800,7 @@ function rcube_text_editor(config, id)
 
       case 'media':
         rx = /^video\//i;
-        img_src = 'program/resources/tinymce/video.png';
+        img_src = rcmail.assets_path('program/resources/tinymce/video.png');
         break;
 
       default:
@@ -803,82 +822,30 @@ function rcube_text_editor(config, id)
           if (e.which == 13) {
             ref.file_browser_close($(this).data('url'));
           }
-          // we need custom Tab key handlers, until we find out why
-          // tabindex do not work here as expected
-          else if (e.which == 9) {
-            if (rcube_event.get_modifier(e) == SHIFT_KEY) {
-              if (!$(this).prev().focus().length)
-                $('#image-upload-button').parents('.mce-panel').find('button:last').parent().focus();
-            }
-            else {
-              if (!$(this).next().focus().length)
-                $('#image-upload-button').focus();
-            }
-
-            return false;
-          }
         });
     }
   };
 
-  // create smart files upload button
-  this.hack_file_input = function(elem, clone_form)
+  this.file_upload_form = function(clone_form)
   {
-    var offset, link = $(elem),
-      file = $('<input>').attr('name', '_file[]'),
-      form = $('<form>').attr({method: 'post', enctype: 'multipart/form-data'});
+    var hint = clone_form ? $(clone_form).find('.hint').text() : '',
+      form = $('<form id="imageuploadform">').attr({method: 'post', enctype: 'multipart/form-data'});
+      file = $('<input>').attr({name: '_file[]', type: 'file', multiple: true, style: 'opacity:0;height:1px;width:1px'})
+        .change(function() { rcmail.upload_file(form, 'upload'); }),
+      wrapper = $('<div class="upload-form">')
+        .append($('<button>').attr({'class': 'btn btn-secondary attach', href: '#', onclick: "rcmail.upload_input('imageuploadform')"}));
+
+    if (hint)
+      wrapper.prepend($('<div class="hint">').text(hint));
 
     // clone existing upload form
     if (clone_form) {
       file.attr('name', $('input[type="file"]', clone_form).attr('name'));
-      form.attr('action', $(clone_form).attr('action'))
-        .append($('<input>').attr({type: 'hidden', name: '_token', value: rcmail.env.request_token}));
+      form.attr('action', $(clone_form).attr('action'));
     }
 
-    function move_file_input(e) {
-      if (!offset) offset = link.offset();
-      file.css({top: (e.pageY - offset.top - 10) + 'px', left: (e.pageX - offset.left - 10) + 'px'});
-    }
+    form.append(file).append($('<input>').attr({type: 'hidden', name: '_token', value: rcmail.env.request_token}));
 
-    file.attr({type: 'file', multiple: 'multiple', size: 5, title: '', tabindex: -1})
-      .change(function() { rcmail.upload_file(form, 'upload'); })
-      .click(function() { setTimeout(function() { link.mouseleave(); }, 20); })
-      // opacity:0 does the trick, display/visibility doesn't work
-      .css({opacity: 0, cursor: 'pointer', position: 'relative', outline: 'none'})
-      .appendTo(form);
-
-    // In FF and IE we need to move the browser file-input's button under the cursor
-    // Thanks to the size attribute above we know the length of the input field
-    if (navigator.userAgent.match(/Firefox|MSIE/))
-      file.css({marginLeft: '-80px'});
-
-    // Note: now, I observe problem with cursor style on FF < 4 only
-    link.css({overflow: 'hidden', cursor: 'pointer'})
-      .mouseenter(function() { this.__active = true; })
-      // place button under the cursor
-      .mousemove(function(e) {
-        if (this.__active)
-          move_file_input(e);
-        // move the input away if button is disabled
-        else
-          $(this).mouseleave();
-      })
-      .mouseleave(function() {
-        file.css({top: '-10000px', left: '-10000px'});
-        this.__active = false;
-      })
-      .click(function(e) {
-        // forward click if mouse-enter event was missed
-        if (!this.__active) {
-          this.__active = true;
-          move_file_input(e);
-          file.trigger(e);
-        }
-      })
-      .keydown(function(e) {
-        if (e.which == 13) file.trigger('click');
-      })
-      .mouseleave()
-      .append(form);
+    return wrapper.append(form);
   };
 }

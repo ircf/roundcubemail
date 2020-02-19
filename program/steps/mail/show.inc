@@ -2,10 +2,9 @@
 
 /**
  +-----------------------------------------------------------------------+
- | program/steps/mail/show.inc                                           |
- |                                                                       |
  | This file is part of the Roundcube Webmail client                     |
- | Copyright (C) 2005-2013, The Roundcube Dev Team                       |
+ |                                                                       |
+ | Copyright (C) The Roundcube Dev Team                                  |
  |                                                                       |
  | Licensed under the GNU General Public License version 3 or            |
  | any later version with exceptions for skins & plugins.                |
@@ -13,7 +12,6 @@
  |                                                                       |
  | PURPOSE:                                                              |
  |   Display a mail message similar as a usual mail application does     |
- |                                                                       |
  +-----------------------------------------------------------------------+
  | Author: Thomas Bruederli <roundcube@gmail.com>                        |
  +-----------------------------------------------------------------------+
@@ -68,23 +66,22 @@ if ($uid) {
 
     $OUTPUT->set_pagetitle(abbreviate_string($MESSAGE->subject, 128, '...', true));
 
-    // set message environment
+    // set environment
     $OUTPUT->set_env('uid', $msg_id);
     $OUTPUT->set_env('safemode', $MESSAGE->is_safe);
     $OUTPUT->set_env('message_context', $MESSAGE->context);
+    $OUTPUT->set_env('message_flags', array_keys(array_change_key_case((array) $MESSAGE->headers->flags)));
     $OUTPUT->set_env('sender', $MESSAGE->sender['string']);
     $OUTPUT->set_env('mailbox', $mbox_name);
     $OUTPUT->set_env('username', $RCMAIL->get_user_name());
     $OUTPUT->set_env('permaurl', $RCMAIL->url(array('_action' => 'show', '_uid' => $msg_id, '_mbox' => $mbox_name)));
     $OUTPUT->set_env('has_writeable_addressbook', $_SESSION['writeable_abook']);
+    $OUTPUT->set_env('delimiter', $RCMAIL->storage->get_hierarchy_delimiter());
+    $OUTPUT->set_env('mimetypes', rcmail_supported_mimetypes());
 
     if ($MESSAGE->headers->get('list-post', false)) {
         $OUTPUT->set_env('list_post', true);
     }
-
-    // set environment
-    $OUTPUT->set_env('delimiter', $RCMAIL->storage->get_hierarchy_delimiter());
-    $OUTPUT->set_env('mimetypes', rcmail_supported_mimetypes());
 
     // set configuration
     $RCMAIL->set_env_config(array('delete_junk', 'flag_for_deletion', 'read_when_deleted',
@@ -197,7 +194,7 @@ function rcmail_message_attachments($attrib)
         foreach ($MESSAGE->attachments as $attach_prop) {
             $filename = rcmail_attachment_name($attach_prop, true);
             $filesize = $RCMAIL->message_part_size($attach_prop);
-            $mimetype = rcmail_fix_mimetype($attach_prop->mimetype);
+            $mimetype = $attach_prop->mimetype;
             $class    = rcube_utils::file2class($mimetype, $filename);
             $id       = 'attach' . $attach_prop->mime_id;
 
@@ -245,8 +242,9 @@ function rcmail_remote_objects_msg()
     $attrib['class'] = 'notice';
     $attrib['style'] = 'display: none';
 
-    $msg = html::span(null, rcube::Q($RCMAIL->gettext('blockedresources'))) . '&nbsp;'
-        . html::a(array(
+    $msg = html::span(null, rcube::Q($RCMAIL->gettext('blockedresources')));
+
+    $buttons = html::a(array(
             'href'    => "#loadremote",
             'onclick' => rcmail_output::JS_OBJECT_NAME.".command('load-remote')"
         ),
@@ -254,7 +252,7 @@ function rcmail_remote_objects_msg()
 
     // add link to save sender in addressbook and reload message
     if ($MESSAGE->sender['mailto'] && $RCMAIL->config->get('show_images') == 1) {
-        $msg .= ' ' . html::a(array(
+        $buttons .= ' ' . html::a(array(
                 'href'    => "#loadremotealways",
                 'onclick' => rcmail_output::JS_OBJECT_NAME.".command('load-remote', true)",
                 'style'   => "white-space:nowrap"
@@ -264,7 +262,7 @@ function rcmail_remote_objects_msg()
 
     $RCMAIL->output->add_gui_object('remoteobjectsmsg', $attrib['id']);
 
-    return html::div($attrib, $msg);
+    return html::div($attrib, $msg . '&nbsp;' . html::span('boxbuttons', $buttons));
 }
 
 function rcmail_message_buttons()
@@ -284,8 +282,8 @@ function rcmail_message_buttons()
     $attrib['id']    = 'message-buttons';
     $attrib['class'] = 'information notice';
 
-    $msg = html::span(null, rcube::Q($RCMAIL->gettext('isdraft'))) . '&nbsp;';
-    $msg .= html::a(array(
+    $msg = html::span(null, rcube::Q($RCMAIL->gettext('isdraft'))) . '&nbsp;'
+        . html::a(array(
             'href'    => "#edit",
             'onclick' => rcmail_output::JS_OBJECT_NAME.".command('edit')"
         ),
@@ -496,16 +494,16 @@ function rcmail_message_headers($attrib, $headers=null)
     // single header value is requested
     if (!empty($attrib['valueof'])) {
         $row = $plugin['output'][$attrib['valueof']];
-        return $row['html'] ? $row['value'] : rcube::Q($row['value']);
+        return $row['html'] ? $row['value'] : rcube::SQ($row['value']);
     }
 
     // compose html table
     $table = new html_table(array('cols' => 2));
 
     foreach ($plugin['output'] as $hkey => $row) {
-        $val = $row['html'] ? $row['value'] : rcube::Q($row['value']);
+        $val = $row['html'] ? $row['value'] : rcube::SQ($row['value']);
 
-        $table->add(array('class' => 'header-title'), rcube::Q($row['title']));
+        $table->add(array('class' => 'header-title'), rcube::SQ($row['title']));
         $table->add(array('class' => 'header '.$hkey), $val);
     }
 
@@ -643,13 +641,10 @@ function rcmail_message_body($attrib)
                 else if (!$part->size) {
                     continue;
                 }
-
                 // Check if we have enough memory to handle the message in it
                 // #1487424: we need up to 10x more memory than the body
                 else if (!rcube_utils::mem_check($part->size * 10)) {
-                    $out .= html::span('part-notice', $RCMAIL->gettext('messagetoobig'). ' '
-                        . html::a('?_task=mail&_action=get&_download=1&_uid='.$MESSAGE->uid.'&_part='.$part->mime_id
-                            .'&_mbox='. urlencode($MESSAGE->folder), $RCMAIL->gettext('download')));
+                    $out .= rcmail_part_too_big_message($MESSAGE, $part->mime_id);
                     continue;
                 }
 
@@ -662,7 +657,7 @@ function rcmail_message_body($attrib)
                 }
 
                 $plugin = $RCMAIL->plugins->exec_hook('message_body_prefix',
-                    array('part' => $part, 'prefix' => ''));
+                    array('part' => $part, 'prefix' => '', 'message' => $MESSAGE));
 
                 // Set attributes of the part container
                 $container_class  = $part->ctype_secondary == 'html' ? 'message-htmlpart' : 'message-part';
@@ -690,7 +685,7 @@ function rcmail_message_body($attrib)
                     $body = rcmail_html4inline($body, $body_args);
                 }
 
-                $out .= html::div($container_attrib, $plugin['prefix'] . $body);
+                $out .= html::div($body_args['container_attrib'], $plugin['prefix'] . $body);
             }
         }
     }
@@ -698,9 +693,7 @@ function rcmail_message_body($attrib)
         // Check if we have enough memory to handle the message in it
         // #1487424: we need up to 10x more memory than the body
         if (!rcube_utils::mem_check(strlen($MESSAGE->body) * 10)) {
-            $out .= html::span('part-notice', $RCMAIL->gettext('messagetoobig'). ' '
-                . html::a('?_task=mail&_action=get&_download=1&_uid='.$MESSAGE->uid.'&_part=0'
-                    .'&_mbox='. urlencode($MESSAGE->folder), $RCMAIL->gettext('download')));
+            $out .= rcmail_part_too_big_message($MESSAGE, 0);
         }
         else {
             $plugin = $RCMAIL->plugins->exec_hook('message_body_prefix',
@@ -782,4 +775,25 @@ function rcmail_message_body($attrib)
     }
 
     return html::div($attrib, $out);
+}
+
+/**
+ * Returns a HTML notice element for too big message parts
+ */
+function rcmail_part_too_big_message($MESSAGE, $part_id)
+{
+    global $RCMAIL;
+
+    $token = $RCMAIL->get_request_token();
+    $url   = $RCMAIL->url(array(
+            'task'     => 'mail',
+            'action'   => 'get',
+            'download' => 1,
+            'uid'      => $MESSAGE->uid,
+            'part'     => $part_id,
+            'mbox'     => $MESSAGE->folder,
+            'token'    => $token,
+    ));
+
+    return html::span('part-notice', $RCMAIL->gettext('messagetoobig') . '&nbsp;' . html::a($url, $RCMAIL->gettext('download')));
 }

@@ -2,8 +2,9 @@
 
 /**
  +-----------------------------------------------------------------------+
- | This file is part of the Roundcube PHP suite                          |
- | Copyright (C) 2005-2017, The Roundcube Dev Team                       |
+ | This file is part of the Roundcube webmail client                     |
+ |                                                                       |
+ | Copyright (C) The Roundcube Dev Team                                  |
  |                                                                       |
  | Licensed under the GNU General Public License version 3 or            |
  | any later version with exceptions for skins & plugins.                |
@@ -57,8 +58,9 @@ foreach ($config as $optname => $optval) {
 }
 
 // framework constants
-define('RCUBE_VERSION', '1.4-git');
+define('RCUBE_VERSION', '1.5-git');
 define('RCUBE_CHARSET', 'UTF-8');
+define('RCUBE_TEMP_FILE_PREFIX', 'RCMTEMP');
 
 if (!defined('RCUBE_LIB_DIR')) {
     define('RCUBE_LIB_DIR', __DIR__ . '/');
@@ -81,12 +83,8 @@ if (!defined('RCUBE_LOCALIZATION_DIR')) {
 }
 
 // set internal encoding for mbstring extension
-if (function_exists('mb_internal_encoding')) {
-    mb_internal_encoding(RCUBE_CHARSET);
-}
-if (function_exists('mb_regex_encoding')) {
-    mb_regex_encoding(RCUBE_CHARSET);
-}
+mb_internal_encoding(RCUBE_CHARSET);
+mb_regex_encoding(RCUBE_CHARSET);
 
 // make sure the Roundcube lib directory is in the include_path
 $rcube_path = realpath(RCUBE_LIB_DIR . '..');
@@ -102,7 +100,7 @@ if (!preg_match($regexp, $path)) {
 spl_autoload_register('rcube_autoload');
 
 // set PEAR error handling (will also load the PEAR main class)
-PEAR::setErrorHandling(PEAR_ERROR_CALLBACK, 'rcube_pear_error');
+PEAR::setErrorHandling(PEAR_ERROR_CALLBACK, function($err) { rcube::raise_error($err, true); });
 
 
 /**
@@ -171,18 +169,26 @@ function parse_bytes($str)
 
 /**
  * Make sure the string ends with a slash
+ *
+ * @param string $str A string
+ *
+ * @return string A string ending with a slash
  */
 function slashify($str)
 {
-  return unslashify($str).'/';
+    return unslashify($str) . '/';
 }
 
 /**
  * Remove slashes at the end of the string
+ *
+ * @param string $str A string
+ *
+ * @return string A string ending with no slash
  */
 function unslashify($str)
 {
-  return preg_replace('/\/+$/', '', $str);
+    return rtrim($str, '/');
 }
 
 /**
@@ -287,6 +293,12 @@ function array_keys_recursive($array)
 
 /**
  * Remove all non-ascii and non-word chars except ., -, _
+ *
+ * @param string $str          A string
+ * @param bool   $css_id       The result may be used as CSS identifier
+ * @param string $replace_with Replacement character
+ *
+ * @return string Clean string
  */
 function asciiwords($str, $css_id = false, $replace_with = '')
 {
@@ -300,7 +312,7 @@ function asciiwords($str, $css_id = false, $replace_with = '')
  * @param string $str           String to check
  * @param bool   $control_chars Includes control characters
  *
- * @return bool
+ * @return bool True if the string contains ASCII-only, False otherwise
  */
 function is_ascii($str, $control_chars = true)
 {
@@ -370,18 +382,23 @@ function version_parse($version)
     );
 }
 
-/**
- * intl replacement functions
- */
+// intl replacement functions
 
 if (!function_exists('idn_to_utf8'))
 {
+    /**
+     * Convert domain name from IDNA ASCII to Unicode
+     *
+     * @param string $domain Domain to convert in an IDNA ASCII-compatible format.
+     *
+     * @return string|false Unicode domain, False on failure
+     */
     function idn_to_utf8($domain)
     {
         static $idn, $loaded;
 
         if (!$loaded) {
-            $idn    = new Net_IDNA2();
+            $idn    = new Net_IDNA2(array('version' => '2008'));
             $loaded = true;
         }
 
@@ -390,6 +407,7 @@ if (!function_exists('idn_to_utf8'))
                 $domain = $idn->decode($domain);
             }
             catch (Exception $e) {
+                return false;
             }
         }
 
@@ -399,12 +417,19 @@ if (!function_exists('idn_to_utf8'))
 
 if (!function_exists('idn_to_ascii'))
 {
+    /**
+     * Convert domain name to IDNA ASCII-compatible form Unicode
+     *
+     * @param string $domain The domain to convert, which must be UTF-8 encoded
+     *
+     * @return string|false The domain name encoded in ASCII-compatible form, False on failure
+     */
     function idn_to_ascii($domain)
     {
         static $idn, $loaded;
 
         if (!$loaded) {
-            $idn    = new Net_IDNA2();
+            $idn    = new Net_IDNA2(array('version' => '2008'));
             $loaded = true;
         }
 
@@ -413,6 +438,7 @@ if (!function_exists('idn_to_ascii'))
                 $domain = $idn->encode($domain);
             }
             catch (Exception $e) {
+                return false;
             }
         }
 
@@ -422,6 +448,10 @@ if (!function_exists('idn_to_ascii'))
 
 /**
  * Use PHP5 autoload for dynamic class loading
+ *
+ * @param string $classname Class name
+ *
+ * @return bool True when the class file has been found
  *
  * @todo Make Zend, PEAR etc play with this
  * @todo Make our classes conform to a more straight forward CS.
@@ -457,18 +487,4 @@ function rcube_autoload($classname)
     }
 
     return false;
-}
-
-/**
- * Local callback function for PEAR errors
- */
-function rcube_pear_error($err)
-{
-    $msg = sprintf("ERROR: %s (%s)", $err->getMessage(), $err->getCode());
-
-    if ($info = $err->getUserinfo()) {
-        $msg .= ': ' . $info;
-    }
-
-    error_log($msg, 0);
 }

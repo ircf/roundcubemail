@@ -4,12 +4,11 @@
  +-------------------------------------------------------------------------+
  | User Interface for the Enigma Plugin                                    |
  |                                                                         |
- | Copyright (C) 2010-2015 The Roundcube Dev Team                          |
+ | Copyright (C) The Roundcube Dev Team                                    |
  |                                                                         |
  | Licensed under the GNU General Public License version 3 or              |
  | any later version with exceptions for skins & plugins.                  |
  | See the README file for a full license statement.                       |
- |                                                                         |
  +-------------------------------------------------------------------------+
  | Author: Aleksander Machniak <alec@alec.pl>                              |
  +-------------------------------------------------------------------------+
@@ -138,6 +137,8 @@ class enigma_ui
         }
 
         $this->enigma->include_script('enigma.js');
+
+        $this->rc->output->set_env('keyservers', $this->rc->config->keyservers());
 
         $this->js_loaded = true;
     }
@@ -416,12 +417,12 @@ class enigma_ui
                 }
             }
 
+            $table->set_row_attribs($subkey->revoked || ($subkey->expires && $subkey->expires < $now) ? 'deleted' : '');
             $table->add('id', $subkey->get_short_id());
             $table->add('algo', $algo);
             $table->add('created', $subkey->created ? $this->rc->format_date($subkey->created, $date_format, false) : '');
             $table->add('expires', $subkey->expires ? $this->rc->format_date($subkey->expires, $date_format, false) : $this->enigma->gettext('expiresnever'));
             $table->add('usage', implode(',', $usage));
-            $table->set_row_attribs($subkey->revoked || ($subkey->expires && $subkey->expires < $now) ? 'deleted' : '');
         }
 
         $out .= html::tag('fieldset', null,
@@ -435,15 +436,20 @@ class enigma_ui
         $table->add_header('valid', $this->enigma->gettext('uservalid'));
 
         foreach ($this->data->users as $user) {
+            // Display domains in UTF8
+            if ($email = rcube_utils::idn_to_utf8($user->email)) {
+                $user->email = $email;
+            }
+
             $username = $user->name;
             if ($user->comment) {
                 $username .= ' (' . $user->comment . ')';
             }
             $username .= ' <' . $user->email . '>';
 
+            $table->set_row_attribs($user->revoked || !$user->valid ? 'deleted' : '');
             $table->add('id', rcube::Q(trim($username)));
             $table->add('valid', $this->enigma->gettext($user->valid ? 'valid' : 'unknown'));
-            $table->set_row_attribs($user->revoked || !$user->valid ? 'deleted' : '');
         }
 
         $out .= html::tag('fieldset', null,
@@ -606,14 +612,15 @@ class enigma_ui
             $upload = new html_inputfield(array('type' => 'file', 'name' => '_file',
                 'id' => 'rcmimportfile', 'size' => 30));
 
+            $max_filesize  = $this->rc->upload_init();
             $upload_button = new html_button(array(
                     'class'   => 'button import',
                     'onclick' => "return rcmail.command('plugin.enigma-import','',this,event)",
             ));
 
-            $form = html::div(null,
-                rcube::Q($this->enigma->gettext('keyimporttext'), 'show')
-                . html::br() . html::br() . $upload->show()
+            $form = html::div(null, html::p(null, rcube::Q($this->enigma->gettext('keyimporttext'), 'show'))
+                . $upload->show()
+                . html::div('hint', $this->rc->gettext(array('id' => 'importfile', 'name' => 'maxuploadsize', 'vars' => array('size' => $max_filesize))))
                 . (empty($attrib['part']) ? html::br() . html::br() . $upload_button->show($this->rc->gettext('import')) : '')
             );
 
@@ -744,13 +751,13 @@ class enigma_ui
         $identities = $plugin['identities'];
 
         foreach ($identities as $idx => $ident) {
-            $name = empty($ident['name']) ? ($ident['email']) : $ident['ident'];
-            $attr = array('value' => $idx, 'data-name' => $ident['name'], 'data-email' => $ident['email']);
+            $name = format_email_recipient($ident['email'], $ident['name']);
+            $attr = array('value' => $idx, 'data-name' => $ident['name'], 'data-email' => $ident['email_ascii']);
             $identities[$idx] = html::tag('li', null, html::label(null, $checkbox->show($idx, $attr) . rcube::Q($name)));
         }
 
         $table->add('title', html::label('key-name', rcube::Q($this->enigma->gettext('newkeyident'))));
-        $table->add(null, html::tag('ul', 'proplist', implode($identities, "\n")));
+        $table->add(null, html::tag('ul', 'proplist', implode("\n", $identities)));
 
         // Key size
         $select = new html_select(array('name' => 'size', 'id' => 'key-size'));
@@ -945,6 +952,9 @@ class enigma_ui
                     $msg     = rcube::Q($this->enigma->gettext($label));
                     $this->password_prompt($status);
                 }
+                else if ($code == enigma_error::NOMDC) {
+                    $msg = rcube::Q($this->enigma->gettext('decryptnomdc'));
+                }
                 else {
                     $msg = rcube::Q($this->enigma->gettext('decrypterror'));
                 }
@@ -975,10 +985,7 @@ class enigma_ui
             $attrib['id'] = 'enigma-message';
 
             if ($sig instanceof enigma_signature) {
-                $sender = $sig->name ?: '';
-                if ($sig->email) {
-                    $sender .= ' <' . $sig->email . '>';
-                }
+                $sender = $sig->get_sender($engine, $p['message'], $part_id);
 
                 if ($sig->valid === enigma_error::UNVERIFIED) {
                     $attrib['class'] = 'boxwarning enigmawarning signed';
@@ -1115,6 +1122,11 @@ class enigma_ui
      */
     function message_ready($p)
     {
+        // The message might have been already encrypted by Mailvelope
+        if (strpos($p['message']->getParam('ctype'), 'multipart/encrypted') === 0) {
+            return $p;
+        }
+
         $savedraft      = !empty($_POST['_draft']) && empty($_GET['_saveonly']);
         $sign_enable    = (bool) rcube_utils::get_input_value('_enigma_sign', rcube_utils::INPUT_POST);
         $encrypt_enable = (bool) rcube_utils::get_input_value('_enigma_encrypt', rcube_utils::INPUT_POST);
@@ -1150,10 +1162,14 @@ class enigma_ui
 
         if ($mode && ($status instanceof enigma_error)) {
             $code = $status->getCode();
-
             if ($code == enigma_error::KEYNOTFOUND) {
-                $vars = array('email' => $status->getData('missing'));
-                $msg  = 'enigma.' . $mode . 'nokey';
+                if ($email = $status->getData('missing')) {
+                    $vars = array('email' => $email);
+                    $msg  = 'enigma.' . $mode . 'nokey';
+                }
+                else {
+                    $msg = 'enigma.' . ($encrypt_enable ? 'encryptnoprivkey' : 'signnokey');
+                }
             }
             else if ($code == enigma_error::BADPASS) {
                 $this->password_prompt($status);
@@ -1242,7 +1258,6 @@ class enigma_ui
         $uid     = rcube_utils::get_input_value('_uid', rcube_utils::INPUT_POST);
         $mbox    = rcube_utils::get_input_value('_mbox', rcube_utils::INPUT_POST);
         $mime_id = rcube_utils::get_input_value('_part', rcube_utils::INPUT_POST);
-        $storage = $this->rc->get_storage();
         $engine  = $this->enigma->load_engine();
 
         if ($uid && $mime_id) {

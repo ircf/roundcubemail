@@ -24,7 +24,7 @@ CREATE TABLE users (
     last_login timestamp with time zone DEFAULT NULL,
     failed_login timestamp with time zone DEFAULT NULL,
     failed_login_counter integer DEFAULT NULL,
-    "language" varchar(5),
+    "language" varchar(16),
     preferences text DEFAULT ''::text NOT NULL,
     CONSTRAINT users_username_key UNIQUE (username, mail_host)
 );
@@ -246,7 +246,7 @@ CREATE INDEX cache_messages_expires_idx ON cache_messages (expires);
 CREATE TABLE dictionary (
     user_id integer DEFAULT NULL
         REFERENCES users (user_id) ON DELETE CASCADE ON UPDATE CASCADE,
-   "language" varchar(5) NOT NULL,
+   "language" varchar(16) NOT NULL,
     data text NOT NULL,
     CONSTRAINT dictionary_user_id_language_key UNIQUE (user_id, "language")
 );
@@ -297,10 +297,11 @@ CREATE TABLE "filestore" (
     file_id integer DEFAULT nextval('filestore_seq'::text) PRIMARY KEY,
     user_id integer NOT NULL
         REFERENCES users (user_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    context varchar(32) NOT NULL,
     filename varchar(128) NOT NULL,
     mtime integer NOT NULL,
     data text NOT NULL,
-    CONSTRAINT filestore_user_id_filename UNIQUE (user_id, filename)
+    CONSTRAINT filestore_user_id_filename UNIQUE (user_id, context, filename)
 );
 
 --
@@ -313,4 +314,4 @@ CREATE TABLE "system" (
     value text
 );
 
-INSERT INTO system (name, value) VALUES ('roundcube-version', '2018021600');
+INSERT INTO "system" (name, value) VALUES ('roundcube-version', '2020020101');

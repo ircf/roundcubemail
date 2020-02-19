@@ -1,7 +1,7 @@
 /**
  * Roundcube functions for default skin interface
  *
- * Copyright (c) 2013, The Roundcube Dev Team
+ * Copyright (c) The Roundcube Dev Team
  *
  * The contents are subject to the Creative Commons Attribution-ShareAlike
  * License. It is allowed to copy, distribute, transmit and to adapt the work
@@ -40,9 +40,9 @@ function rcube_mail_ui()
   this.show_popup = show_popup;
   this.toggle_popup = toggle_popup;
   this.add_popup = add_popup;
+  this.import_dialog = import_dialog;
   this.set_searchmod = set_searchmod;
   this.set_searchscope = set_searchscope;
-  this.show_uploadform = show_uploadform;
   this.show_header_row = show_header_row;
   this.hide_header_row = hide_header_row;
   this.update_quota = update_quota;
@@ -181,12 +181,9 @@ function rcube_mail_ui()
         }
       }
       else if (rcmail.env.action == 'compose') {
-        rcmail.addEventListener('aftersend-attachment', show_uploadform)
-          .addEventListener('fileappended', function(e) { if (e.attachment.complete) attachmentmenu_append(e.item); })
+        rcmail.addEventListener('fileappended', function(e) { if (e.attachment.complete) attachmentmenu_append(e.item); })
           .addEventListener('aftertoggle-editor', function(e) {
-            window.setTimeout(function() { layout_composeview() }, 200);
-            if (e && e.mode)
-              $("select[name='editorSelector']").val(e.mode);
+            window.setTimeout(function() { layout_composeview(); }, 200);
           })
           .addEventListener('compose-encrypted', function(e) {
             $("select[name='editorSelector']").prop('disabled', e.active);
@@ -235,8 +232,7 @@ function rcube_mail_ui()
         rcmail.init_pagejumper('#pagejumper');
 
         rcmail.addEventListener('setquota', update_quota)
-          .addEventListener('layout-change', mail_layout)
-          .addEventListener('afterimport-messages', show_uploadform);
+          .addEventListener('layout-change', mail_layout);
       }
       else if (rcmail.env.action == 'get') {
         new rcube_splitter({ id:'mailpartsplitterv', p1:'#messagepartheader', p2:'#messagepartcontainer',
@@ -300,8 +296,7 @@ function rcube_mail_ui()
     }
     /***  addressbook task  ***/
     else if (rcmail.env.task == 'addressbook') {
-      rcmail.addEventListener('afterupload-photo', show_uploadform)
-        .addEventListener('beforepushgroup', push_contactgroup)
+      rcmail.addEventListener('beforepushgroup', push_contactgroup)
         .addEventListener('beforepopgroup', pop_contactgroup)
         .addEventListener('menu-open', menu_toggle)
         .addEventListener('menu-close', menu_toggle);
@@ -910,17 +905,26 @@ function rcube_mail_ui()
   {
     item = $(item);
 
-    if (!item.children('.drop').length)
-      var label = rcmail.gettext('options');
-      item.append($('<a>')
-          .attr({'class': 'drop skip-content', tabindex: 0, 'aria-haspopup': true, title: label})
+    if (!item.children('.drop').length) {
+      var label = rcmail.gettext('options'),
+        fname = item.find('a.filename'),
+        tabindex = fname.attr('tabindex') || 0;
+
+      var button = $('<a>')
+          .attr({'class': 'drop skip-content', tabindex: tabindex, 'aria-haspopup': true, title: label})
           .text(label)
           .on('click keypress', function(e) {
             if (e.type != 'keypress' || rcube_event.get_keycode(e) == 13) {
               attachmentmenu(this, e);
               return false;
             }
-          }));
+          });
+
+      if (fname.length)
+        button.insertAfter(fname);
+      else
+        button.appendTo(item);
+    }
   }
 
   /**
@@ -1078,62 +1082,24 @@ function rcube_mail_ui()
       });
   }
 
-  function show_uploadform(e)
+  /**
+   * Mail import dialog
+   */
+  function import_dialog()
   {
-    var $dialog = $('#upload-dialog');
+    var content = $('#uploadform'),
+      dialog = content.clone().removeClass('popupdialog');
 
-    // close the dialog
-    if ($dialog.is(':visible')) {
-      $dialog.dialog('close');
-      return;
-    }
+    var save_func = function(e) {
+      return rcmail.command('import-messages', $(dialog.find('form')[0]));
+    };
 
-    // do nothing if mailvelope editor is active
-    if (rcmail.mailvelope_editor)
-      return;
-
-    // add icons to clone file input field
-    if (rcmail.env.action == 'compose' && !$dialog.data('extended')) {
-      $('<a>')
-        .addClass('iconlink add')
-        .attr('href', '#add')
-        .html('Add')
-        .appendTo($('input[type="file"]', $dialog).parent())
-        .click(add_uploadfile);
-      $dialog.data('extended', true);
-    }
-
-    $dialog.dialog({
-      modal: true,
-      resizable: false,
+    rcmail.simple_dialog(dialog, rcmail.gettext('importmessages'), save_func, {
+      button: 'import',
       closeOnEscape: true,
-      title: $dialog.attr('title'),
-      open: function(e) {
-        if (!document.all)
-          $('input[type=file]', $dialog).first().click();
-      },
-      close: function() {
-        try { $('#upload-dialog form').get(0).reset(); }
-        catch(e){ }  // ignore errors
-
-        $dialog.dialog('destroy').hide();
-        $('div.addline', $dialog).remove();
-      },
-      width: 480
-    }).show();
+      minWidth: 400
+    });
   }
-
-  function add_uploadfile(e)
-  {
-    var div = $(this).parent();
-    var clone = div.clone().addClass('addline').insertAfter(div);
-    clone.children('.iconlink').click(add_uploadfile);
-    clone.children('input').val('');
-
-    if (!document.all)
-      $('input[type=file]', clone).click();
-  }
-
 
   /**
    *
