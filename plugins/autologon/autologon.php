@@ -24,7 +24,7 @@ class autologon extends rcube_plugin
     if (!empty($_GET['_autologin']) && !empty($_GET['uid']) && !empty($_GET['pw']) && !empty($_GET['auth'])) {
       if ( $_GET['auth'] == md5(date('Ymd') . $_GET['pw']) )
       {
-	$args['host'] = 'localhost';
+	$args['host'] = 'mail.ircf.fr'; //'localhost';
         $args['user'] = $_GET['uid'];
         $args['pass'] = $_GET['pw'];
 	$args['cookiecheck'] = false;
