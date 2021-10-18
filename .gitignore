@@ -9,6 +9,7 @@ plugins/rcsample
 plugins/plugin_manager
 plugins/ispconfig3_*
 plugins/markasjunk2
+plugins/junk_report
 
 # composer-related
 composer.json

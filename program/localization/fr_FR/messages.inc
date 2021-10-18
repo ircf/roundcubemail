@@ -17,7 +17,7 @@
 $messages['errortitle']  = 'Une erreur est survenue';
 $messages['loginfailed']  = 'La connexion a échoué.';
 $messages['cookiesdisabled'] = 'Votre navigateur n’accepte pas les témoins.';
-$messages['sessionerror'] = 'Votre session est invalide ou a expiré.';
+$messages['sessionerror'] = 'Votre session est invalide ou a expiré, veuillez vous connecter.';
 $messages['cookiesmismatch'] = 'Une non-concordance de témoin a été détectée. Veuillez effacer les témoins de votre navigateur.';
 $messages['storageerror'] = 'Erreur de connexion au serveur de stockage.';
 $messages['servererror'] = 'Erreur de serveur';
