@@ -2,8 +2,7 @@
 
 class ShowAdditionalHeaders_Plugin extends PHPUnit\Framework\TestCase
 {
-
-    function setUp()
+    public static function setUpBeforeClass(): void
     {
         include_once __DIR__ . '/../show_additional_headers.php';
     }
@@ -20,4 +19,3 @@ class ShowAdditionalHeaders_Plugin extends PHPUnit\Framework\TestCase
         $this->assertInstanceOf('rcube_plugin', $plugin);
     }
 }
-

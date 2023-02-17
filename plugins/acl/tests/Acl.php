@@ -1,9 +1,8 @@
 <?php
 
-class Acl_Plugin extends PHPUnit\Framework\TestCase
+class Acl_Plugin extends ActionTestCase
 {
-
-    function setUp()
+    static function setUpBeforeClass(): void
     {
         include_once __DIR__ . '/../acl.php';
     }
@@ -18,6 +17,8 @@ class Acl_Plugin extends PHPUnit\Framework\TestCase
 
         $this->assertInstanceOf('acl', $plugin);
         $this->assertInstanceOf('rcube_plugin', $plugin);
+
+        $plugin->init();
     }
 }
 

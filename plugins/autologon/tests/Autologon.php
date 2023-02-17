@@ -2,8 +2,7 @@
 
 class Autologon_Plugin extends PHPUnit\Framework\TestCase
 {
-
-    function setUp()
+    public static function setUpBeforeClass(): void
     {
         include_once __DIR__ . '/../autologon.php';
     }
@@ -18,6 +17,10 @@ class Autologon_Plugin extends PHPUnit\Framework\TestCase
 
         $this->assertInstanceOf('autologon', $plugin);
         $this->assertInstanceOf('rcube_plugin', $plugin);
+
+        // TODO
+        $plugin->startup([]);
+        $plugin->authenticate([]);
     }
 }
 

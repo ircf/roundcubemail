@@ -33,10 +33,9 @@ if (empty($SOURCES['dependencies'])) {
     rcube::raise_error("Failed to read dependencies list from $cfgfile", false, true);
 }
 
-$CURL     = trim(`which curl`);
-$WGET     = trim(`which wget`);
-$UNZIP    = trim(`which unzip`);
-$FILEINFO = trim(`which file`);
+$CURL  = trim(`which curl`);
+$WGET  = trim(`which wget`);
+$UNZIP = trim(`which unzip`);
 
 if (($CACHEDIR = getenv("CACHEDIR")) && is_writeable($CACHEDIR)) {
     // use $CACHEDIR
@@ -51,7 +50,7 @@ else {
 
 //////////////// License definitions
 
-$LICENSES = array();
+$LICENSES = [];
 $LICENSES['MIT'] = <<<EOM
  * Licensed under the MIT licenses
  *
@@ -123,22 +122,26 @@ function fetch_from_source($package, $useCache = true, &$filetype = null)
 
         echo "Fetching $url\n";
 
-        if ($CURL)
+        if ($CURL) {
             exec(sprintf('%s -L -s %s -o %s', $CURL, escapeshellarg($url), $cache_file), $out, $retval);
-        else
+        }
+        else {
             exec(sprintf('%s -q %s -O %s', $WGET, escapeshellarg($url), $cache_file), $out, $retval);
+        }
 
         // Try Github API as a fallback (#6248)
-        if ($retval !== 0 && $package['api_url']) {
+        if ($retval !== 0 && !empty($package['api_url'])) {
             $url    = str_replace('$v', $package['version'], $package['api_url']);
             $header = 'Accept:application/vnd.github.v3.raw';
 
             rcube::raise_error("Fetching failed. Using Github API on $url");
 
-            if ($CURL)
+            if ($CURL) {
                 exec(sprintf('%s -L -H %s -s %s -o %s', $CURL, escapeshellarg($header), escapeshellarg($url), $cache_file), $out, $retval);
-            else
+            }
+            else {
                 exec(sprintf('%s --header %s -q %s -O %s', $WGET, escapeshellarg($header), escapeshellarg($url), $cache_file), $out, $retval);
+            }
         }
 
         if ($retval !== 0) {
@@ -154,19 +157,17 @@ function fetch_from_source($package, $useCache = true, &$filetype = null)
  */
 function extract_filetype($package, &$filetype = null)
 {
-    global $FILEINFO, $CACHEDIR;
+    global $CACHEDIR;
 
     $filetype   = pathinfo($package['url'], PATHINFO_EXTENSION) ?: 'tmp';
     $cache_file = $CACHEDIR . '/' . $package['lib'] . '-' . $package['version'] . '.' . $filetype;
 
-    if (empty($FILEINFO)) {
-        rcube::raise_error("Required program 'file' not found.", false, true);
-    }
-
-    // detect downloaded/cached file type
-    exec(sprintf('%s -b %s', $FILEINFO, $cache_file), $out);
-    if (stripos($out[0], 'zip') === 0) {
-        $filetype = 'zip';
+    // Make sure it is a zip file
+    if (file_exists($cache_file)) {
+        $magic = file_get_contents($cache_file, false, null, 0, 4);
+        if ($magic === "PK\003\004") {
+            $filetype = 'zip';
+        }
     }
 
     return $cache_file;
@@ -248,7 +249,7 @@ function extract_zipfile($package, $srcfile)
             mkdir($extract, 0774, true);
         }
 
-        $zip_command = '%s -' . ($package['flat'] ? 'j' : 'o') . ' %s -d %s';
+        $zip_command = '%s -' . (!empty($package['flat']) ? 'j' : 'o') . ' %s -d %s';
         exec(sprintf($zip_command, $UNZIP, escapeshellarg($srcfile), $extract), $out, $retval);
 
         // get the root folder of the extracted package
@@ -259,7 +260,7 @@ function extract_zipfile($package, $srcfile)
             echo "Installing $sourcedir/$src into $destdir/$dest\n";
 
             $dest_file = $destdir . '/' . $dest;
-            $src_file = $sourcedir . '/' . $src;
+            $src_file  = $sourcedir . '/' . $src;
 
             // make sure the destination's parent directory exists
             if (strpos($dest, '/') !== false) {
@@ -324,7 +325,7 @@ function extract_zipfile($package, $srcfile)
  */
 function delete_destfile($package)
 {
-    $destdir = INSTALL_PATH . ($package['rm'] ?: $package['dest']);
+    $destdir = INSTALL_PATH . (!empty($package['rm']) ? $package['rm'] : $package['dest']);
 
     if (file_exists($destdir)) {
         if (PHP_OS === 'Windows') {
@@ -339,9 +340,20 @@ function delete_destfile($package)
 
 //////////////// Execution
 
-$args = rcube_utils::get_opt(array('f' => 'force:bool', 'd' => 'delete:bool', 'g' => 'get:bool', 'e' => 'extract:bool'))
-        + array('force' => false, 'delete' => false, 'get' => false, 'extract' => false);
-$WHAT = $args[0];
+$args = rcube_utils::get_opt([
+        'f' => 'force:bool',
+        'd' => 'delete:bool',
+        'g' => 'get:bool',
+        'e' => 'extract:bool'
+    ])
+    + [
+        'force'   => false,
+        'delete'  => false,
+        'get'     => false,
+        'extract' => false
+    ];
+
+$WHAT     = isset($args[0]) ? $args[0] : null;
 $useCache = !$args['force'] && !$args['get'];
 
 if (!$args['get'] && !$args['extract'] && !$args['delete']) {

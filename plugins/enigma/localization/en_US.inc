@@ -14,7 +14,7 @@
  For translation see https://www.transifex.com/roundcube/roundcube-webmail/plugin-enigma/
 */
 
-$labels = array();
+$labels = [];
 $labels['encryption'] = 'Encryption';
 $labels['enigmacerts'] = 'S/MIME Certificates';
 $labels['enigmakeys'] = 'PGP Keys';
@@ -71,9 +71,10 @@ $labels['keyadd'] = 'Add key';
 $labels['newkeyident'] = 'Identity';
 $labels['newkeypass'] = 'Password';
 $labels['newkeypassconfirm'] = 'Confirm password';
-$labels['newkeysize'] = 'Key size';
-$labels['key2048'] = '2048 bits - default';
-$labels['key4096'] = '4096 bits - more secure';
+$labels['newkeytype'] = 'Key type';
+$labels['rsa2048'] = 'RSA - 2048 bits';
+$labels['rsa4096'] = 'RSA - 4096 bits';
+$labels['ecckeypair'] = 'ECC (Elliptic Curve)';
 $labels['keygenerating'] = 'Generating keys...';
 
 $labels['encryptionoptions'] = 'Encryption options...';
@@ -100,7 +101,7 @@ $labels['arialabelkeyexportoptions'] = 'Keys export options';
 $labels['arialabelkeysearchform'] = 'Keys search form';
 $labels['arialabelkeyoptions'] = 'Key options';
 
-$messages = array();
+$messages = [];
 $messages['sigvalid'] = 'Verified signature from $sender.';
 $messages['sigvalidpartial'] = 'Verified signature from $sender, but part of the body was not signed.';
 $messages['siginvalid'] = 'Invalid signature from $sender.';
@@ -133,6 +134,7 @@ $messages['keyremovesuccess'] = 'Key(s) deleted successfully';
 $messages['keyremoveerror'] = 'Unable to delete selected key(s).';
 $messages['keyimporttext'] = 'You can import private and public key(s) or revocation signatures in ASCII-Armor format.';
 $messages['keyimportsearchtext'] = 'You can search for public keys by key identifier, user name or email address and then import them directly.';
+$messages['keystoragenotice'] = 'All public and private keys are stored on the server.';
 
 $messages['formerror'] = 'Please, fill the form. All fields are required!';
 $messages['passwordsdiffer'] = 'Passwords do not match!';
@@ -144,4 +146,7 @@ $messages['noidentselected'] = 'You have to select at least one identity for the
 // removed in 1.3
 $messages['nonameident'] = 'Identity must have a user name defined!';
 
-?>
+// removed in 1.5
+$labels['newkeysize'] = 'Key size';
+$labels['key2048'] = '2048 bits - default';
+$labels['key4096'] = '4096 bits - more secure';

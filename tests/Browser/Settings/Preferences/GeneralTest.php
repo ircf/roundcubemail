@@ -6,7 +6,9 @@ use Tests\Browser\Components\App;
 
 class GeneralTest extends \Tests\Browser\TestCase
 {
-    public static function setUpBeforeClass()
+    private $settings;
+
+    public static function setUpBeforeClass(): void
     {
         \bootstrap::init_db();
     }
@@ -74,12 +76,12 @@ class GeneralTest extends \Tests\Browser\TestCase
                     $browser->assertSelected('select[name=_refresh_interval]', $this->app->config->get('refresh_interval')/60);
                 });
 
-                // Interface Skin fieldset
+                // TODO: Interface Skin fieldset
+                /*
                 $browser->with('form.propform fieldset.skin', function ($browser) {
                     $browser->assertSeeIn('legend', 'Interface skin');
-
-                    // TODO
                 });
+                */
 
                 // Browser Options fieldset
                 $browser->with('form.propform fieldset.browser', function ($browser) {

@@ -6,7 +6,7 @@ use Tests\Browser\Components\Popupmenu;
 
 class MailTest extends \Tests\Browser\TestCase
 {
-    public static function setUpBeforeClass()
+    public static function setUpBeforeClass(): void
     {
         \bootstrap::init_db();
         \bootstrap::init_imap();
@@ -97,10 +97,11 @@ class MailTest extends \Tests\Browser\TestCase
             $browser->go('mail');
 
             $browser->whenAvailable('#messagelist tbody', function ($browser) {
-                $browser->mouseover('tr:last-child')->doubleClick();
+                $browser->click('tr:last-child');
             });
 
-            $browser->waitFor('#message-content');
+            $browser->waitFor('#messagecontframe')
+                ->waitUntilMissing('#messagestack');
 
             // Toolbar menu (Junk button active), click it
             $browser->clickToolbarMenuItem('junk')
@@ -119,10 +120,11 @@ class MailTest extends \Tests\Browser\TestCase
             });
 
             $browser->whenAvailable('#messagelist tbody', function ($browser) {
-                $browser->mouseover('tr:last-child')->doubleClick();
+                $browser->click('tr:last-child');
             });
 
-            $browser->waitFor('#message-content');
+            $browser->waitFor('#messagecontframe')
+                ->waitUntilMissing('#messagestack');
 
             // Toolbar menu (Junk button active), click it
             $browser->clickToolbarMenuItem('notjunk')

@@ -8,7 +8,7 @@ use Tests\Browser\Components\Popupmenu;
 
 class IdentitiesTest extends \Tests\Browser\TestCase
 {
-    public static function setUpBeforeClass()
+    public static function setUpBeforeClass(): void
     {
         \bootstrap::init_db();
     }
@@ -42,6 +42,9 @@ class IdentitiesTest extends \Tests\Browser\TestCase
 
     /**
      * Test identity creation
+     *
+     * @group failsontravis-phone
+     * @group failsonga-phone
      */
     public function testIdentityCreate()
     {
@@ -140,6 +143,8 @@ class IdentitiesTest extends \Tests\Browser\TestCase
      * Test identity deletion
      *
      * @depends testIdentityCreate
+     * @group failsontravis-phone
+     * @group failsonga-phone
      */
     public function testIdentityDelete()
     {
@@ -176,6 +181,8 @@ class IdentitiesTest extends \Tests\Browser\TestCase
      * Test identity update
      *
      * @depends testIdentityDelete
+     * @group failsontravis-phone
+     * @group failsonga-phone
      */
     public function testIdentityUpdate()
     {
@@ -221,6 +228,8 @@ class IdentitiesTest extends \Tests\Browser\TestCase
      * Test identities in mail composer
      *
      * @depends testIdentityUpdate
+     * @group failsontravis-phone
+     * @group failsonga-phone
      */
     public function testIdentitiesInComposer()
     {

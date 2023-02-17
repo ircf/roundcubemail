@@ -38,7 +38,9 @@ require_once(__DIR__ . '/Browser.php');
 require_once(__DIR__ . '/TestCase.php');
 require_once(__DIR__ . '/Components/App.php');
 require_once(__DIR__ . '/Components/Dialog.php');
+require_once(__DIR__ . '/Components/HtmlEditor.php');
 require_once(__DIR__ . '/Components/Popupmenu.php');
+require_once(__DIR__ . '/Components/RecipientInput.php');
 require_once(__DIR__ . '/Components/Taskmenu.php');
 require_once(__DIR__ . '/Components/Toolbarmenu.php');
 
@@ -68,6 +70,8 @@ class bootstrap
                 $db->query("DROP TABLE $table");
             }
 
+            self::init_db_user($db);
+
             // init database with schema
             system(sprintf('cat %s %s | mysql -h %s -u %s --password=%s %s',
                 realpath(INSTALL_PATH . '/SQL/mysql.initial.sql'),
@@ -82,6 +86,8 @@ class bootstrap
             $db->closeConnection();
             // delete database file
             system(sprintf('rm -f %s', escapeshellarg($dsn['database'])));
+
+            self::init_db_user($db);
 
             // load sample test data
             // Note: exec_script() does not really work with these queries
@@ -98,14 +104,33 @@ class bootstrap
     }
 
     /**
+     * Create user/identity record for the test user
+     */
+    private static function init_db_user($db)
+    {
+        $rcmail = rcmail::get_instance();
+        $imap_host = $rcmail->config->get('imap_host');
+
+        if ($host = parse_url($imap_host, PHP_URL_HOST)) {
+            $imap_host = $host;
+        }
+
+        $db->query("INSERT INTO `users` (`username`, `mail_host`, `language`)"
+                . " VALUES (?, ?, 'en_US')", TESTS_USER, $imap_host);
+
+        $db->query("INSERT INTO `identities` (`user_id`, `email`, `standard`)"
+                . " VALUES (1, ?, '1')", TESTS_USER);
+    }
+
+    /**
      * Wipe the configured IMAP account and fill with test data
      */
-    public static function init_imap()
+    public static function init_imap($force = false)
     {
         if (!TESTS_USER) {
             return false;
         }
-        else if (self::$imap_ready !== null) {
+        else if (!$force && self::$imap_ready !== null) {
             return self::$imap_ready;
         }
 
@@ -127,16 +152,16 @@ class bootstrap
             self::$imap_ready = false;
         }
 
-        $imap_host = $rcmail->config->get('default_host');
+        $imap_host = $rcmail->config->get('imap_host');
+        $imap_port = 143;
+        $imap_ssl = false;
+
         $a_host = parse_url($imap_host);
-        if ($a_host['host']) {
+
+        if (!empty($a_host['host'])) {
             $imap_host = $a_host['host'];
-            $imap_ssl  = isset($a_host['scheme']) && in_array($a_host['scheme'], array('ssl','imaps','tls'));
-            $imap_port = isset($a_host['port']) ? $a_host['port'] : ($imap_ssl ? 993 : 143);
-        }
-        else {
-            $imap_port = 143;
-            $imap_ssl = false;
+            $imap_ssl  = isset($a_host['scheme']) && in_array($a_host['scheme'], ['ssl','imaps','tls']) ? $a_host['scheme'] : false;
+            $imap_port = $a_host['port'] ?? ($imap_ssl && $imap_ssl != 'tls' ? 993 : 143);
         }
 
         if (!$imap->connect($imap_host, $username, $password, $imap_port, $imap_ssl)) {
@@ -161,8 +186,10 @@ class bootstrap
             rcube::raise_error(__METHOD__ . ': IMAP connection unavailable', false, true);
         }
 
+        $file = file_get_contents($filename);
         $imap = rcmail::get_instance()->get_storage();
-        $imap->save_message($mailbox, file_get_contents($filename));
+
+        $imap->save_message($mailbox, $file);
     }
 
     /**

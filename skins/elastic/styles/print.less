@@ -19,6 +19,10 @@ body {
 #print-layout {
     margin: 1rem;
 
+    #logo {
+        max-height: 80px;
+    }
+
     // Overwrites for mail message printouts
 
     .image-attachment {
@@ -31,21 +35,16 @@ body {
         }
     }
 
-    .header-content {
-        .message-partheaders {
-            padding: 0 !important;
-            border: 0;
-            font-size: 1rem;
-            color: inherit;
-        }
-    }
-
     #message-header {
         margin-bottom: .5rem;
     }
 
     .attachment-size {
         padding-left: .1rem;
+    }
+
+    blockquote {
+        page-break-inside: auto;
     }
 
     // Overwrites for contact printouts
@@ -66,7 +65,7 @@ body {
         }
     }
 
-    .propform.groupped .row.input-group .input-group-text {
+    .propform.grouped .row.input-group .input-group-text {
         padding: 0;
         min-width: 12rem;
         background: #fff;

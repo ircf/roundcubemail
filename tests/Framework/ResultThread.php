@@ -72,7 +72,7 @@ class Framework_ResultThread extends PHPUnit\Framework\TestCase
         $this->assertSame($expected[19], $tree[19]);
 
         $clone = clone $object;
-        $clone->filter(array(7));
+        $clone->filter([7]);
         $clone = $clone->get_tree();
 
         $this->assertSame(1, count($clone), "Structure check");
@@ -86,8 +86,28 @@ class Framework_ResultThread extends PHPUnit\Framework\TestCase
         $this->assertSame(1, count($clone[7][458][464]), "Structure check");
         $this->assertSame(0, count($clone[7][458][464][471]), "Structure check");
 
-        $object->filter(array(784));
+        $object->filter([784]);
         $this->assertSame(118, $object->count_messages(), "Messages filter");
         $this->assertSame(1, $object->count(), "Messages filter (count)");
+    }
+
+    /**
+     * thread parser test (empty result)
+     */
+    function test_parse_empty()
+    {
+        $object = new rcube_result_thread('INBOX', "* THREAD");
+
+        $this->assertSame(true, $object->is_empty(), "Object is empty");
+        $this->assertSame(false, $object->is_error(), "Object is error");
+        $this->assertSame(null, $object->max(), "Max message UID");
+        $this->assertSame(null, $object->min(), "Min message UID");
+        $this->assertSame(0, $object->count(), "Threads count");
+        $this->assertSame(0, $object->count_messages(), "Messages count");
+        $this->assertSame(false, $object->exists(1720, true), "Message exists");
+        $this->assertSame(false, $object->exists(1720), "Message exists (bool)");
+        $this->assertSame(null, $object->get_element('FIRST'), "Get first element");
+        $this->assertSame(null, $object->get_element('LAST'), "Get last element");
+        $this->assertSame(null, $object->get_element(2), "Get specified element");
     }
 }
