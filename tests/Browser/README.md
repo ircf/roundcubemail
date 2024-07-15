@@ -14,10 +14,9 @@ INSTALLATION
 
 Installation:
 
-0. Note that the suite has been tested with PHP 7.3 and 7.4.
 1. Install Laravel Dusk with all dependencies.
 ```
-composer require "laravel/dusk:~5.7.0"
+composer require "laravel/dusk:^7.9"
 ```
 2. Install Chrome WebDriver for the version of Chrome/Chromium in your system. Yes,
    you have to have Chrome/Chromium installed.
@@ -28,7 +27,7 @@ php tests/Browser/install.php [version]
 
 Create a config file named `config-test.inc.php` in the Roundcube config dir.
 That file should provide specific `db_dsnw` and
-`default_host` values for testing purposes as well as the credentials of a
+`imap_host` values for testing purposes as well as the credentials of a
 valid IMAP user account used for running the tests with.
 
 Add these config options used by the Browser tests:

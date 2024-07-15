@@ -1,9 +1,10 @@
 <?php
 
-namespace Tests\Browser\Components;
+namespace Roundcube\Tests\Browser\Components;
 
-use Tests\Browser\Browser;
+use Facebook\WebDriver\WebDriverKeys;
 use Laravel\Dusk\Component;
+use Roundcube\Tests\Browser\Browser;
 
 class Dialog extends Component
 {
@@ -22,6 +23,7 @@ class Dialog extends Component
      *
      * @return string
      */
+    #[\Override]
     public function selector()
     {
         // work with the specified dialog (in case there's more than one)
@@ -33,10 +35,9 @@ class Dialog extends Component
      * Assert that the browser page contains the component.
      *
      * @param Browser $browser
-     *
-     * @return void
      */
-    public function assert($browser)
+    #[\Override]
+    public function assert($browser): void
     {
         $browser->waitFor($this->selector());
     }
@@ -46,6 +47,7 @@ class Dialog extends Component
      *
      * @return array
      */
+    #[\Override]
     public function elements()
     {
         return [
@@ -77,7 +79,7 @@ class Dialog extends Component
     public function assertButton($browser, $name, $label)
     {
         $selector = "@footer button.{$name}";
-        $browser->assertVisible($selector, $title)
+        $browser->assertVisible($selector)
             ->assertSeeIn($selector, $label);
     }
 
@@ -107,7 +109,7 @@ class Dialog extends Component
      */
     public function pressESC($browser)
     {
-        $browser->driver->getKeyboard()->sendKeys(\Facebook\WebDriver\WebDriverKeys::ESCAPE);
+        $browser->driver->getKeyboard()->sendKeys(WebDriverKeys::ESCAPE);
         $browser->waitUntilMissing($this->selector());
     }
 
@@ -116,8 +118,8 @@ class Dialog extends Component
      */
     public function withinDialogFrame($browser, $callback)
     {
-        $browser->withinFrame('@content iframe', function ($browser) use ($callback) {
-            $browser->withinBody(function ($browser) use ($callback) {
+        $browser->withinFrame('@content iframe', static function ($browser) use ($callback) {
+            $browser->withinBody(static function ($browser) use ($callback) {
                 $callback($browser);
             });
         });

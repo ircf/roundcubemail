@@ -2,18 +2,21 @@
 
 namespace Tests\Browser\Plugins\Zipdownload;
 
-use Tests\Browser\Components\Popupmenu;
+use Roundcube\Tests\Browser\Bootstrap;
+use Roundcube\Tests\Browser\Components\Popupmenu;
+use Roundcube\Tests\Browser\TestCase;
 
-class MailTest extends \Tests\Browser\TestCase
+class MailTest extends TestCase
 {
-    public static function setUpBeforeClass()
+    #[\Override]
+    public static function setUpBeforeClass(): void
     {
-        \bootstrap::init_imap();
-        \bootstrap::purge_mailbox('INBOX');
+        Bootstrap::init_imap();
+        Bootstrap::purge_mailbox('INBOX');
 
         // import single email messages
         foreach (glob(TESTS_DIR . 'data/mail/list_0?.eml') as $f) {
-            \bootstrap::import_message($f, 'INBOX');
+            Bootstrap::import_message($f, 'INBOX');
         }
     }
 
@@ -22,14 +25,14 @@ class MailTest extends \Tests\Browser\TestCase
         $this->browse(function ($browser) {
             $browser->go('mail');
 
-            $browser->whenAvailable('#messagelist tbody', function ($browser) {
+            $browser->whenAvailable('#messagelist tbody', static function ($browser) {
                 $browser->ctrlClick('tr:first-child');
             });
 
             // Test More > Download > Source (single message selected)
-            $browser->clickToolbarMenuItem('more')
-                ->with(new Popupmenu('message-menu'), function ($browser) {
-                    $browser->clickMenuItem('download');
+            $browser->clickToolbarMenuItem('more', null, false)
+                ->with(new Popupmenu('message-menu'), static function ($browser) {
+                    $browser->clickMenuItem('download', null, false);
                 })
                 ->with(new Popupmenu('zipdownload-menu'), function ($browser) {
                     $browser->assertVisible('a.download.eml:not(.disabled)')
@@ -48,9 +51,9 @@ class MailTest extends \Tests\Browser\TestCase
 
             // Test More > Download > Mailbox format (two messages selected)
             $browser->ctrlClick('#messagelist tbody tr:nth-of-type(2)')
-                ->clickToolbarMenuItem('more')
-                ->with(new Popupmenu('message-menu'), function ($browser) {
-                    $browser->clickMenuItem('download');
+                ->clickToolbarMenuItem('more', null, false)
+                ->with(new Popupmenu('message-menu'), static function ($browser) {
+                    $browser->clickMenuItem('download', null, false);
                 })
                 ->with(new Popupmenu('zipdownload-menu'), function ($browser) {
                     $browser->assertVisible('a.download.eml.disabled')
@@ -66,9 +69,9 @@ class MailTest extends \Tests\Browser\TestCase
                 });
 
             // Test More > Download > Maildir format (two messages selected)
-            $browser->clickToolbarMenuItem('more')
-                ->with(new Popupmenu('message-menu'), function ($browser) {
-                    $browser->clickMenuItem('download');
+            $browser->clickToolbarMenuItem('more', null, false)
+                ->with(new Popupmenu('message-menu'), static function ($browser) {
+                    $browser->clickMenuItem('download', null, false);
                 })
                 ->with(new Popupmenu('zipdownload-menu'), function ($browser) {
                     $browser->click('a.download.maildir');
@@ -84,16 +87,16 @@ class MailTest extends \Tests\Browser\TestCase
                 ->waitForMessage('loading', 'Loading...')
                 ->waitFor('#messagecontframe')
                 ->waitUntilMissing('#messagestack')
-                ->withinFrame('#messagecontframe', function ($browser) {
+                ->withinFrame('#messagecontframe', static function ($browser) {
                     $browser->waitFor('.header-links a.zipdownload')
                         ->click('.header-links a.zipdownload');
                 });
 
-                $filename = 'Lines.zip';
-                $files = $this->getFilesFromZip($filename);
-                $browser->removeDownloadedFile($filename);
-                $expected = ['lines.txt', 'lines_lf.txt'];
-                $this->assertSame($expected, $files);
+            $filename = 'Lines.zip';
+            $files = $this->getFilesFromZip($filename);
+            $browser->removeDownloadedFile($filename);
+            $expected = ['lines.txt', 'lines_lf.txt'];
+            $this->assertSame($expected, $files);
         });
     }
 
@@ -102,14 +105,14 @@ class MailTest extends \Tests\Browser\TestCase
      */
     private function getFilesFromZip($filename)
     {
-        $filename = TESTS_DIR . "downloads/$filename";
+        $filename = TESTS_DIR . "downloads/{$filename}";
 
         // Give the browser a chance to finish download
         if (!file_exists($filename)) {
             sleep(2);
         }
 
-        $zip   = new \ZipArchive;
+        $zip = new \ZipArchive();
         $files = [];
 
         if ($zip->open($filename)) {

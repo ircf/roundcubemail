@@ -1,11 +1,14 @@
 <?php
 
+use ZxcvbnPhp\Zxcvbn;
+
 /**
  * Zxcvb Password Strength Driver
  *
  * Driver to check password strength using Zxcvbn-PHP
  *
  * @version 0.1
+ *
  * @author Philip Weir
  *
  * Copyright (C) Philip Weir
@@ -26,13 +29,13 @@
 
 class rcube_zxcvbn_password
 {
-    function strength_rules()
+    public function strength_rules()
     {
         $rcmail = rcmail::get_instance();
-        $rules  = array(
+        $rules = [
             $rcmail->gettext('password.passwordnoseq'),
             $rcmail->gettext('password.passwordnocommon'),
-        );
+        ];
 
         return $rules;
     }
@@ -44,20 +47,21 @@ class rcube_zxcvbn_password
      *
      * @return array Score (1 to 5) and Reason
      */
-    function check_strength($passwd)
+    public function check_strength($passwd)
     {
         if (!class_exists('ZxcvbnPhp\Zxcvbn')) {
-            rcube::raise_error(array(
-                'code' => 600,
-                'file' => __FILE__, 'line' => __LINE__,
-                'message' => "Password plugin: Zxcvbn library not found."
-                ), true, false);
-            return;
+            rcube::raise_error('Password plugin: Zxcvbn library not found.', true, true);
         }
 
-        $zxcvbn   = new ZxcvbnPhp\Zxcvbn();
-        $strength = $zxcvbn->passwordStrength($passwd);
+        $rcmail = rcmail::get_instance();
+        $userData = [
+            $rcmail->user->get_username('local'),
+            $_SESSION['username'],
+        ];
 
-        return array($strength['score'] + 1, $strength['feedback']['warning']);
+        $zxcvbn = new Zxcvbn(); // @phpstan-ignore-line
+        $strength = $zxcvbn->passwordStrength($passwd, $userData); // @phpstan-ignore-line
+
+        return [$strength['score'] + 1, $strength['feedback']['warning']];
     }
 }

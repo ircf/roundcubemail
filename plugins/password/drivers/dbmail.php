@@ -4,7 +4,7 @@
  * DBMail Password Driver
  *
  * Driver that adds functionality to change the users DBMail password.
- * The code is derrived from the Squirrelmail "Change SASL Password" Plugin
+ * The code is derived from the Squirrelmail "Change SASL Password" Plugin
  * by Galen Johnson.
  *
  * It only works with dbmail-users on the same host where Roundcube runs
@@ -32,13 +32,13 @@
 
 class rcube_dbmail_password
 {
-    function save($currpass, $newpass, $username)
+    public function save($currpass, $newpass, $username)
     {
-        $curdir   = RCUBE_PLUGINS_DIR . 'password/helpers';
+        $curdir = RCUBE_PLUGINS_DIR . 'password/helpers';
         $username = escapeshellarg($username);
         $password = escapeshellarg($newpass);
-        $args     = rcmail::get_instance()->config->get('password_dbmail_args', '');
-        $command  = "$curdir/chgdbmailusers -c $username -w $password $args";
+        $args = rcmail::get_instance()->config->get('password_dbmail_args', '');
+        $command = "{$curdir}/chgdbmailusers -c {$username} -w {$password} {$args}";
 
         exec($command, $output, $return_value);
 
@@ -46,12 +46,7 @@ class rcube_dbmail_password
             return PASSWORD_SUCCESS;
         }
 
-        rcube::raise_error(array(
-                'code' => 600,
-                'type' => 'php',
-                'file' => __FILE__, 'line' => __LINE__,
-                'message' => "Password plugin: Unable to execute $curdir/chgdbmailusers"
-            ), true, false);
+        rcube::raise_error("Password plugin: Unable to execute {$curdir}/chgdbmailusers", true);
 
         return PASSWORD_ERROR;
     }

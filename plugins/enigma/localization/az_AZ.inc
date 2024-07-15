@@ -1,6 +1,6 @@
 <?php
 
-/**
+/*
  +-----------------------------------------------------------------------+
  | Localization file of the Roundcube Webmail Enigma plugin              |
  |                                                                       |
@@ -21,4 +21,3 @@ $labels['subkeycreated'] = 'Yaradılma tarixi';
 $labels['expiresnever'] = 'heç vaxt';
 $labels['unknown'] = 'naməlum';
 $labels['newkeypass'] = 'Şifrə';
-?>

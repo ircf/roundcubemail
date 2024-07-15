@@ -1,20 +1,23 @@
 <?php
 
-namespace Tests\Browser\Mail;
+namespace Roundcube\Tests\Browser\Mail;
 
-use Tests\Browser\Components\App;
-use Tests\Browser\Components\Popupmenu;
+use Roundcube\Tests\Browser\Bootstrap;
+use Roundcube\Tests\Browser\Components\App;
+use Roundcube\Tests\Browser\Components\Popupmenu;
+use Roundcube\Tests\Browser\TestCase;
 
-class PrintTest extends \Tests\Browser\TestCase
+class PrintTest extends TestCase
 {
-    public static function setUpBeforeClass()
+    #[\Override]
+    public static function setUpBeforeClass(): void
     {
-        \bootstrap::init_imap();
-        \bootstrap::purge_mailbox('INBOX');
+        Bootstrap::init_imap(true);
+        Bootstrap::purge_mailbox('INBOX');
 
         // import email messages
         foreach (glob(TESTS_DIR . 'data/mail/list_00.eml') as $f) {
-            \bootstrap::import_message($f, 'INBOX');
+            Bootstrap::import_message($f, 'INBOX');
         }
     }
 
@@ -29,7 +32,7 @@ class PrintTest extends \Tests\Browser\TestCase
             $browser->waitFor('#messagelist tbody tr:first-child')
                 ->ctrlClick('#messagelist tbody tr:first-child');
 
-            $browser->clickToolbarMenuItem('more');
+            $browser->clickToolbarMenuItem('more', null, false);
 
             $browser->with(new Popupmenu('message-menu'), function ($browser) use (&$current_window, &$new_window) {
                 if ($browser->isPhone()) {
@@ -37,17 +40,17 @@ class PrintTest extends \Tests\Browser\TestCase
                     $this->markTestSkipped();
                 }
 
-                list($current_window, $new_window) = $browser->openWindow(function ($browser) {
+                [$current_window, $new_window] = $browser->openWindow(static function ($browser) {
                     $browser->clickMenuItem('print');
                 });
             });
 
             $browser->driver->switchTo()->window($new_window);
 
-            $browser->with(new App(), function ($browser) {
+            $browser->with(new App(), static function ($browser) {
                 $browser->assertEnv([
-                        'task' => 'mail',
-                        'action' => 'print',
+                    'task' => 'mail',
+                    'action' => 'print',
                 ]);
             });
 
@@ -56,7 +59,7 @@ class PrintTest extends \Tests\Browser\TestCase
                 ->assertSeeIn('.message-part div.pre', 'Plain text message body.')
                 ->assertVisible('.message-part div.pre .sig')
                 // Tests "more recipients" link
-                ->with('.headers-table .header.cc', function ($browser) {
+                ->with('.header-headers .header.cc', static function ($browser) {
                     $browser->assertSee('test10@domain.tld')
                         ->assertDontSee('test11@domain.tld')
                         ->assertSeeIn('a.morelink', '2 more...')

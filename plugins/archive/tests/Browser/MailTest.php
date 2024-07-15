@@ -2,26 +2,29 @@
 
 namespace Tests\Browser\Plugins\Archive;
 
-use Tests\Browser\Components\Popupmenu;
+use Roundcube\Tests\Browser\Bootstrap;
+use Roundcube\Tests\Browser\Components\Popupmenu;
+use Roundcube\Tests\Browser\TestCase;
 
-class MailTest extends \Tests\Browser\TestCase
+class MailTest extends TestCase
 {
-    public static function setUpBeforeClass()
+    #[\Override]
+    public static function setUpBeforeClass(): void
     {
-        \bootstrap::init_db();
-        \bootstrap::init_imap();
-        \bootstrap::purge_mailbox('INBOX');
-        \bootstrap::purge_mailbox('Archive');
+        Bootstrap::init_db();
+        Bootstrap::init_imap();
+        Bootstrap::purge_mailbox('INBOX');
+        Bootstrap::purge_mailbox('Archive');
 
         // import single email messages
         foreach (glob(TESTS_DIR . 'data/mail/list_00.eml') as $f) {
-            \bootstrap::import_message($f, 'INBOX');
+            Bootstrap::import_message($f, 'INBOX');
         }
     }
 
     public function testMailUI()
     {
-        $this->browse(function ($browser) {
+        $this->browse(static function ($browser) {
             $browser->go('mail');
 
             if (!$browser->isDesktop()) {
@@ -29,7 +32,7 @@ class MailTest extends \Tests\Browser\TestCase
             }
 
             // Folders list
-            $browser->whenAvailable('#mailboxlist', function ($browser) {
+            $browser->whenAvailable('#mailboxlist', static function ($browser) {
                 $browser->assertVisible('li.mailbox.archive')
                     ->assertMissing('li.mailbox.archive .unreadcount');
             });
@@ -41,7 +44,7 @@ class MailTest extends \Tests\Browser\TestCase
             // Toolbar menu (Archive button inactive)
             $browser->assertToolbarMenu([], ['archive']);
 
-            $browser->whenAvailable('#messagelist tbody', function ($browser) {
+            $browser->whenAvailable('#messagelist tbody', static function ($browser) {
                 $browser->ctrlClick('tr:last-child');
             });
 
@@ -54,7 +57,7 @@ class MailTest extends \Tests\Browser\TestCase
             }
 
             // Folders list
-            $browser->whenAvailable('#mailboxlist', function ($browser) {
+            $browser->whenAvailable('#mailboxlist', static function ($browser) {
                 $browser->assertSeeIn('li.mailbox.archive .unreadcount', '1')
                     ->click('li.mailbox.archive')
                     ->waitUntilNotBusy();
@@ -68,15 +71,15 @@ class MailTest extends \Tests\Browser\TestCase
 
             // Test archive class on folder in folder selector
             $browser->ctrlClick('#messagelist tbody tr')
-                ->clickToolbarMenuItem('more')
-                    ->with(new Popupmenu('message-menu'), function ($browser) {
-                        $browser->clickMenuItem('move');
-                    })
-                    ->with(new Popupmenu('folder-selector'), function ($browser) {
-                        $browser->assertVisible('li.archive')
-                            ->assertSeeIn('li.archive', 'Archive');
-                    })
-                    ->click(); // close menus
+                ->clickToolbarMenuItem('more', null, false)
+                ->with(new Popupmenu('message-menu'), static function ($browser) {
+                    $browser->clickMenuItem('move');
+                })
+                ->with(new Popupmenu('folder-selector'), static function ($browser) {
+                    $browser->assertVisible('li.archive')
+                        ->assertSeeIn('li.archive', 'Archive');
+                })
+                ->click(); // close menus
         });
     }
 }

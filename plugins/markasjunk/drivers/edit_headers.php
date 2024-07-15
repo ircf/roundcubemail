@@ -38,26 +38,27 @@ class markasjunk_edit_headers
 
     private function _edit_headers(&$uids, $spam, $dst_mbox)
     {
-        $rcube = rcube::get_instance();
-        $args  = $rcube->config->get($spam ? 'markasjunk_spam_patterns' : 'markasjunk_ham_patterns');
+        $rcube = rcmail::get_instance();
+        $args = $rcube->config->get($spam ? 'markasjunk_spam_patterns' : 'markasjunk_ham_patterns');
 
-        if (count($args['patterns']) == 0) {
+        if (empty($args['patterns'])) {
             return;
         }
 
-        $new_uids = array();
+        $new_uids = [];
+
         foreach ($uids as $uid) {
             $raw_message = $rcube->storage->get_raw_body($uid);
             $raw_headers = $rcube->storage->get_raw_headers($uid);
 
             $updated_headers = preg_replace($args['patterns'], $args['replacements'], $raw_headers);
-            $raw_message     = str_replace($raw_headers, $updated_headers, $raw_message);
+            $raw_message = str_replace($raw_headers, $updated_headers, $raw_message);
 
             $saved = $rcube->storage->save_message($dst_mbox, $raw_message);
 
             if ($saved !== false) {
-                $rcube->output->command('markasjunk_move', null, array($uid));
-                array_push($new_uids, $saved);
+                $rcube->output->command('markasjunk_move', null, [$uid]);
+                $new_uids[] = $saved;
             }
         }
 

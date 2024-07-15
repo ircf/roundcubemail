@@ -6,6 +6,7 @@
  * Driver for passwords stored in SQL database
  *
  * @version 2.1
+ *
  * @author Aleksander Machniak <alec@alec.pl>
  *
  * Copyright (C) The Roundcube Dev Team
@@ -33,19 +34,18 @@ class rcube_sql_password
      *
      * @return int Result
      */
-    function save($curpass, $passwd)
+    public function save($curpass, $passwd)
     {
         $rcmail = rcmail::get_instance();
 
         if (!($sql = $rcmail->config->get('password_query'))) {
-            $sql = 'SELECT update_passwd(%c, %u)';
+            $sql = 'SELECT update_passwd(%P, %u)';
         }
 
         if ($dsn = $rcmail->config->get('password_db_dsn')) {
             $db = rcube_db::factory(self::parse_dsn($dsn), '', false);
-            $db->set_debug((bool)$rcmail->config->get('sql_debug'));
-        }
-        else {
+            $db->set_debug((bool) $rcmail->config->get('sql_debug'));
+        } else {
             $db = $rcmail->get_dbh();
         }
 
@@ -57,98 +57,44 @@ class rcube_sql_password
         if (strpos($sql, '%P') !== false) {
             $password = password::hash_password($passwd);
 
-            if ($password === false) {
-                return PASSWORD_CRYPT_ERROR;
-            }
-
-            $sql = str_replace('%P',  $db->quote($password), $sql);
+            $sql = str_replace('%P', $db->quote($password), $sql);
         }
 
         // old password - default hash method
         if (strpos($sql, '%O') !== false) {
             $password = password::hash_password($curpass);
 
-            if ($password === false) {
-                return PASSWORD_CRYPT_ERROR;
-            }
-
-            $sql = str_replace('%O',  $db->quote($password), $sql);
-        }
-
-        // crypted password (deprecated, use %P)
-        if (strpos($sql, '%c') !== false) {
-            $password = password::hash_password($passwd, 'crypt', false);
-
-            if ($password === false) {
-                return PASSWORD_CRYPT_ERROR;
-            }
-
-            $sql = str_replace('%c',  $db->quote($password), $sql);
-        }
-
-        // dovecotpw (deprecated, use %P)
-        if (strpos($sql, '%D') !== false) {
-            $password = password::hash_password($passwd, 'dovecot', false);
-
-            if ($password === false) {
-                return PASSWORD_CRYPT_ERROR;
-            }
-
-            $sql = str_replace('%D', $db->quote($password), $sql);
-        }
-
-        // hashed passwords (deprecated, use %P)
-        if (strpos($sql, '%n') !== false) {
-            $password = password::hash_password($passwd, 'hash', false);
-
-            if ($password === false) {
-                return PASSWORD_CRYPT_ERROR;
-            }
-
-            $sql = str_replace('%n', $db->quote($password, 'text'), $sql);
-        }
-
-        // hashed passwords (deprecated, use %P)
-        if (strpos($sql, '%q') !== false) {
-            $password = password::hash_password($curpass, 'hash', false);
-
-            if ($password === false) {
-                return PASSWORD_CRYPT_ERROR;
-            }
-
-            $sql = str_replace('%q', $db->quote($password, 'text'), $sql);
+            $sql = str_replace('%O', $db->quote($password), $sql);
         }
 
         // Handle clear text passwords securely (#1487034)
-        $sql_vars = array();
+        $sql_vars = [];
         if (preg_match_all('/%[p|o]/', $sql, $m)) {
             foreach ($m[0] as $var) {
                 if ($var == '%p') {
                     $sql = preg_replace('/%p/', '?', $sql, 1);
                     $sql_vars[] = (string) $passwd;
-                }
-                else { // %o
+                } else { // %o
                     $sql = preg_replace('/%o/', '?', $sql, 1);
                     $sql_vars[] = (string) $curpass;
                 }
             }
         }
 
-        $local_part  = $rcmail->user->get_username('local');
+        $local_part = $rcmail->user->get_username('local');
         $domain_part = $rcmail->user->get_username('domain');
-        $username    = $_SESSION['username'];
-        $host        = $_SESSION['imap_host'];
+        $username = $_SESSION['username'];
+        $host = $_SESSION['imap_host'];
 
-        // convert domains to/from punnycode
+        // convert domains to/from punycode
         if ($rcmail->config->get('password_idn_ascii')) {
             $domain_part = rcube_utils::idn_to_ascii($domain_part);
-            $username    = rcube_utils::idn_to_ascii($username);
-            $host        = rcube_utils::idn_to_ascii($host);
-        }
-        else {
+            $username = rcube_utils::idn_to_ascii($username);
+            $host = rcube_utils::idn_to_ascii($host);
+        } else {
             $domain_part = rcube_utils::idn_to_utf8($domain_part);
-            $username    = rcube_utils::idn_to_utf8($username);
-            $host        = rcube_utils::idn_to_utf8($host);
+            $username = rcube_utils::idn_to_utf8($username);
+            $host = rcube_utils::idn_to_utf8($host);
         }
 
         // at least we should always have the local part
@@ -159,13 +105,12 @@ class rcube_sql_password
 
         $res = $db->query($sql, $sql_vars);
 
-        if (!$db->is_error()) {
-            if (strtolower(substr(trim($sql),0,6)) == 'select') {
+        if (!$db->is_error($res)) {
+            if (strtolower(substr(trim($sql), 0, 6)) == 'select') {
                 if ($db->fetch_array($res)) {
                     return PASSWORD_SUCCESS;
                 }
-            }
-            else {
+            } else {
                 // Note: Don't be tempted to check affected_rows = 1. For some queries
                 // (e.g. INSERT ... ON DUPLICATE KEY UPDATE) the result can be 2.
                 if ($db->affected_rows($res) > 0) {
@@ -189,7 +134,7 @@ class rcube_sql_password
         if (strpos($dsn, '%')) {
             // parse DSN and replace variables in hostname
             $parsed = rcube_db::parse_dsn($dsn);
-            $host   = rcube_utils::parse_host($parsed['hostspec']);
+            $host = rcube_utils::parse_host($parsed['hostspec']);
 
             // build back the DSN string
             if ($host != $parsed['hostspec']) {

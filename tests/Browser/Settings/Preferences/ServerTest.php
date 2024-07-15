@@ -1,14 +1,19 @@
 <?php
 
-namespace Tests\Browser\Settings\Preferences;
+namespace Roundcube\Tests\Browser\Settings\Preferences;
 
-use Tests\Browser\Components\App;
+use Roundcube\Tests\Browser\Bootstrap;
+use Roundcube\Tests\Browser\Components\App;
+use Roundcube\Tests\Browser\TestCase;
 
-class ServerTest extends \Tests\Browser\TestCase
+class ServerTest extends TestCase
 {
-    public static function setUpBeforeClass()
+    private $settings;
+
+    #[\Override]
+    public static function setUpBeforeClass(): void
     {
-        \bootstrap::init_db();
+        Bootstrap::init_db();
     }
 
     public function testServer()
@@ -16,10 +21,10 @@ class ServerTest extends \Tests\Browser\TestCase
         $this->settings = [
             'read_when_deleted' => true,
             'flag_for_deletion' => false,
-            'skip_deleted'      => false,
-            'delete_junk'       => false,
-            'logout_purge'      => false,
-            'logout_expunge'    => false,
+            'skip_deleted' => false,
+            'delete_junk' => false,
+            'logout_purge' => 'never',
+            'logout_expunge' => false,
         ];
 
         $this->browse(function ($browser) {
@@ -28,7 +33,7 @@ class ServerTest extends \Tests\Browser\TestCase
             $browser->click('#sections-table tr.server');
 
             if ($browser->isPhone()) {
-                $browser->whenAvailable('#layout-content .footer', function ($browser) {
+                $browser->whenAvailable('#layout-content .footer', static function ($browser) {
                     $browser->assertVisible('a.button.submit:not(.disabled)')
                         ->assertVisible('a.button.prev:not(.disabled)')
                         ->assertVisible('a.button.next');
@@ -41,7 +46,7 @@ class ServerTest extends \Tests\Browser\TestCase
                 }
 
                 // check task and action
-                $browser->with(new App(), function ($browser) {
+                $browser->with(new App(), static function ($browser) {
                     $browser->assertEnv('task', 'settings');
                     $browser->assertEnv('action', 'edit-prefs');
                 });
@@ -63,7 +68,7 @@ class ServerTest extends \Tests\Browser\TestCase
                         ->setCheckboxState('_skip_deleted', $this->settings['skip_deleted'] = !$this->settings['skip_deleted']);
 
                     $browser->assertSeeIn('label[for=rcmfd_delete_junk]', 'Directly delete messages in Junk')
-                        ->assertCheckboxState('_delete_junk',  $this->settings['delete_junk'])
+                        ->assertCheckboxState('_delete_junk', $this->settings['delete_junk'])
                         ->setCheckboxState('_delete_junk', $this->settings['delete_junk'] = !$this->settings['delete_junk']);
                 });
 
@@ -72,8 +77,11 @@ class ServerTest extends \Tests\Browser\TestCase
                     $browser->assertSeeIn('legend', 'Maintenance');
 
                     $browser->assertSeeIn('label[for=rcmfd_logout_purge]', 'Clear Trash on logout')
-                        ->assertCheckboxState('_logout_purge', $this->settings['logout_purge'])
-                        ->setCheckboxState('_logout_purge', $this->settings['logout_purge'] = !$this->settings['logout_purge']);
+                        ->assertVisible('select[name=_logout_purge]')
+                        ->assertSelected('select[name=_logout_purge]', $this->settings['logout_purge']);
+
+                    $this->settings['logout_purge'] = '30';
+                    $browser->select('select[name=_logout_purge]', '30');
 
                     $browser->assertSeeIn('label[for=rcmfd_logout_expunge]', 'Compact Inbox on logout')
                         ->assertCheckboxState('_logout_expunge', $this->settings['logout_expunge'])
@@ -95,13 +103,17 @@ class ServerTest extends \Tests\Browser\TestCase
             // Verify if every option has been updated
             $browser->withinFrame('#preferences-frame', function ($browser) {
                 foreach ($this->settings as $key => $value) {
-                    $browser->assertCheckboxState('_' . $key, $value);
+                    if (is_bool($value)) {
+                        $browser->assertCheckboxState('_' . $key, $value);
+                    } else {
+                        $browser->assertValue("[name=_{$key}]", $value);
+                    }
                 }
             });
         });
 
         // Assert the options have been saved in database properly
-        $prefs = \bootstrap::get_prefs();
+        $prefs = Bootstrap::get_prefs();
 
         foreach ($this->settings as $key => $value) {
             $this->assertSame($value, $prefs[$key]);

@@ -40,24 +40,24 @@ class markasjunk_email_learn
 
     private function _do_emaillearn($uids, $spam)
     {
-        $this->rcube  = rcube::get_instance();
-        $identity_arr = $this->rcube->user->get_identity();
-        $from         = $identity_arr['email'];
-        $from_string  = format_email_recipient($identity_arr['email'], $identity_arr['name']);
-        $attach       = $this->rcube->config->get('markasjunk_email_attach', false);
-        $debug        = $this->rcube->config->get('markasjunk_debug');
-        $temp_dir     = unslashify($this->rcube->config->get('temp_dir'));
+        $this->rcube = rcmail::get_instance();
+        $identity = $this->rcube->user->get_identity();
+        $from = $identity['email'];
+        $from_string = format_email_recipient($from, $identity['name']);
+        $attach = $this->rcube->config->get('markasjunk_email_attach', false);
+        $debug = $this->rcube->config->get('markasjunk_debug');
+        $product = $this->rcube->config->get('product_name');
+        $temp_dir = unslashify($this->rcube->config->get('temp_dir'));
 
-        $mailto = $this->rcube->config->get($spam ? 'markasjunk_email_spam' : 'markasjunk_email_ham');
+        $subject = (string) $this->rcube->config->get('markasjunk_email_subject');
+        $mailto = (string) $this->rcube->config->get($spam ? 'markasjunk_email_spam' : 'markasjunk_email_ham');
+        $subject = $this->_parse_vars($subject, $spam, $from);
         $mailto = $this->_parse_vars($mailto, $spam, $from);
 
         // no address to send to, exit
         if (!$mailto) {
             return;
         }
-
-        $subject = $this->rcube->config->get('markasjunk_email_subject');
-        $subject = $this->_parse_vars($subject, $spam, $from);
 
         foreach ($uids as $i => $uid) {
             $MESSAGE = new rcube_message($uid);
@@ -68,55 +68,55 @@ class markasjunk_email_learn
                 $this->rcube->storage->set_charset($MESSAGE->headers->charset);
             }
 
-            $OUTPUT   = $this->rcube->output;
-            $SENDMAIL = new rcmail_sendmail(null, array(
-                    'sendmail' => true,
-                    'from' => $from,
-                    'mailto' => $mailto,
-                    'dsn_enabled' => false,
-                    'charset' => 'UTF-8',
-                    'error_handler' => function() use ($OUTPUT) {
-                        call_user_func_array(array($OUTPUT, 'show_message'), func_get_args());
-                        $OUTPUT->send();
-                    }
-                ));
+            $OUTPUT = $this->rcube->output;
+            $SENDMAIL = new rcmail_sendmail(null, [
+                'sendmail' => true,
+                'from' => $from,
+                'mailto' => $mailto,
+                'dsn_enabled' => false,
+                'charset' => 'UTF-8',
+                'error_handler' => static function (...$args) use ($OUTPUT) {
+                    call_user_func_array([$OUTPUT, 'show_message'], $args);
+                    $OUTPUT->send();
+                },
+            ]);
 
             if ($attach) {
-                $headers = array(
+                $headers = [
                     'Date' => $this->rcube->user_date(),
                     'From' => $from_string,
                     'To' => $mailto,
                     'Subject' => $subject,
                     'User-Agent' => $this->rcube->config->get('useragent'),
                     'Message-ID' => $this->rcube->gen_message_id($from),
-                    'X-Sender' => $from
-                );
+                    'X-Sender' => $from,
+                ];
 
-                $message_text = ($spam ? 'Spam' : 'Ham') . ' report from ' . $this->rcube->config->get('product_name');
+                $message_text = ($spam ? 'Spam' : 'Ham') . " report from {$product}";
 
                 // create attachment
                 $orig_subject = $MESSAGE->get_header('subject');
-                $disp_name    = (!empty($orig_subject) ? $orig_subject : 'message_rfc822') . '.eml';
+                $disp_name = (!empty($orig_subject) ? $orig_subject : 'message_rfc822') . '.eml';
                 $message_file = tempnam($temp_dir, 'rcm');
-                $attachment   = array();
+                $attachment = [];
 
                 if ($fp = fopen($message_file, 'w')) {
                     $this->rcube->storage->get_raw_body($uid, $fp);
                     fclose($fp);
 
-                    $attachment = array(
-                        'name'     => $disp_name,
+                    $attachment = [
+                        'name' => $disp_name,
                         'mimetype' => 'message/rfc822',
-                        'path'     => $message_file,
-                        'size'     => filesize($message_file),
-                        'charset'  => $MESSAGE->headers->charset
-                    );
+                        'path' => $message_file,
+                        'size' => filesize($message_file),
+                        'charset' => $MESSAGE->headers->charset,
+                    ];
                 }
 
                 // create message
-                $MAIL_MIME = $SENDMAIL->create_message($headers, $message_text, false, array($attachment));
+                $MAIL_MIME = $SENDMAIL->create_message($headers, $message_text, false, [$attachment]);
 
-                if (count($attachment) > 0) { // sanity check incase creating the attachment failed
+                if (count($attachment) > 0) { // sanity check in case creating the attachment failed
                     $folding = (int) $this->rcube->config->get('mime_param_folding');
 
                     $MAIL_MIME->addAttachment($attachment['path'],
@@ -127,24 +127,22 @@ class markasjunk_email_learn
                         '', RCUBE_CHARSET
                     );
                 }
-            }
-            else {
-                $headers = array(
-                    'Resent-From'       => $from_string,
-                    'Resent-To'         => $mailto,
-                    'Resent-Date'       => $this->rcube->user_date(),
-                    'Resent-Message-ID' => $this->rcube->gen_message_id($from)
-                );
+            } else {
+                $headers = [
+                    'Resent-From' => $from_string,
+                    'Resent-To' => $mailto,
+                    'Resent-Date' => $this->rcube->user_date(),
+                    'Resent-Message-ID' => $this->rcube->gen_message_id($from),
+                ];
 
                 // create the bounce message
-                $MAIL_MIME = new rcmail_resend_mail(array(
+                $MAIL_MIME = new rcmail_resend_mail([
                     'bounce_message' => $MESSAGE,
                     'bounce_headers' => $headers,
-                ));
+                ]);
             }
 
             $SENDMAIL->deliver_message($MAIL_MIME, $i == count($uids) - 1);
-            $message_file = $message_file ?: $MAIL_MIME->mailbody_file;
 
             // clean up
             if ($message_file) {
@@ -153,10 +151,6 @@ class markasjunk_email_learn
 
             if ($debug) {
                 rcube::write_log('markasjunk', $uid . ($spam ? ' SPAM ' : ' HAM ') . $mailto . ' (' . $subject . ')');
-
-                if ($smtp_error['vars']) {
-                    rcube::write_log('markasjunk', $smtp_error['vars']);
-                }
             }
         }
     }

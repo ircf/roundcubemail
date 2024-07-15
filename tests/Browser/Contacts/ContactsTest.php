@@ -1,14 +1,17 @@
 <?php
 
-namespace Tests\Browser\Contacts;
+namespace Roundcube\Tests\Browser\Contacts;
 
-use Tests\Browser\Components\App;
+use Roundcube\Tests\Browser\Bootstrap;
+use Roundcube\Tests\Browser\Components\App;
+use Roundcube\Tests\Browser\TestCase;
 
-class ContactsTest extends \Tests\Browser\TestCase
+class ContactsTest extends TestCase
 {
-    public static function setUpBeforeClass()
+    #[\Override]
+    public static function setUpBeforeClass(): void
     {
-        \bootstrap::init_db();
+        Bootstrap::init_db();
     }
 
     /**
@@ -16,10 +19,10 @@ class ContactsTest extends \Tests\Browser\TestCase
      */
     public function testContactsUI()
     {
-        $this->browse(function ($browser) {
+        $this->browse(static function ($browser) {
             $browser->go('addressbook');
 
-            $browser->with(new App(), function ($browser) {
+            $browser->with(new App(), static function ($browser) {
                 // check task
                 $browser->assertEnv('task', 'addressbook');
 
@@ -42,22 +45,19 @@ class ContactsTest extends \Tests\Browser\TestCase
                 $browser->assertMissing('#contacts-table');
                 $browser->click('#directorylist li:first-child');
                 $browser->waitFor('#contacts-table');
-            }
-            else {
+            } else {
                 $browser->assertVisible('#contacts-table');
             }
 
             // Contacts list menu
             if ($browser->isPhone()) {
                 $browser->assertToolbarMenu(['select'], []);
-            }
-            else if ($browser->isTablet()) {
+            } elseif ($browser->isTablet()) {
                 $browser->click('.toolbar-list-button')
                     ->waitFor('#toolbar-list-menu')
                     ->assertVisible('#toolbar-list-menu a.select:not(.disabled)')
                     ->click();
-            }
-            else {
+            } else {
                 $browser->assertVisible('#toolbar-list-menu a.select:not(.disabled)');
             }
 

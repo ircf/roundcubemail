@@ -1,5 +1,11 @@
 <?php
 
+namespace Roundcube\Tests\Browser;
+
+use GuzzleHttp\Client as HttpClient;
+use Laravel\Dusk\Console\ChromeDriverCommand;
+use Laravel\Dusk\OperatingSystem;
+
 /*
  +-----------------------------------------------------------------------+
  | This file is part of the Roundcube Webmail client                     |
@@ -17,38 +23,42 @@
  +-----------------------------------------------------------------------+
 */
 
-if (php_sapi_name() != 'cli')
-  die("Not in shell mode (php-cli)");
+if (\PHP_SAPI != 'cli') {
+    exit('Not in shell mode (php-cli)');
+}
 
-if (!defined('INSTALL_PATH')) define('INSTALL_PATH', realpath(__DIR__ . '/../../') . '/' );
+if (!defined('INSTALL_PATH')) {
+    define('INSTALL_PATH', realpath(__DIR__ . '/../../') . '/');
+}
 
-require_once(INSTALL_PATH . 'program/include/iniset.php');
+require_once INSTALL_PATH . 'program/include/iniset.php';
 
-class Installer extends Laravel\Dusk\Console\ChromeDriverCommand
+class Installer extends ChromeDriverCommand
 {
     /**
      * Execute the console command.
      *
      * @param string $version
-     *
-     * @return void
      */
-    public function install($version = null)
+    public function install($version = ''): void
     {
-        $version = $version ? preg_replace('/\..*/', '', $version) : $this->latestVersion();
-        $version = trim($this->getUrl(sprintf($this->versionUrl, $version)));
-        $currentOS = Laravel\Dusk\OperatingSystem::id();
+        $os = OperatingSystem::id();
+        $version = trim($version);
+        $archive = $this->directory . 'chromedriver.zip';
 
-        foreach ($this->slugs as $os => $slug) {
-            if ($os === $currentOS) {
-                $archive = $this->download($version, $slug);
-                $binary = $this->extract($archive);
+        $url = $this->resolveChromeDriverDownloadUrl($version, $os);
 
-                $this->rename($binary, $os);
-            }
-        }
+        $client = new HttpClient();
 
-        echo "ChromeDriver binary successfully installed for version $version.\n";
+        $response = $client->get($url);
+
+        $data = file_put_contents($archive, $response->getBody());
+
+        $binary = $this->extract($version, $archive);
+
+        $this->rename($binary, $os);
+
+        echo "ChromeDriver binary successfully installed for version {$version}.\n";
     }
 
     /**
@@ -56,13 +66,18 @@ class Installer extends Laravel\Dusk\Console\ChromeDriverCommand
      *
      * @param string $url URL
      *
-     * @return string|bool
+     * @return string
      */
+    #[\Override]
     protected function getUrl(string $url)
     {
-        return file_get_contents($url);
+        return file_get_contents($url) ?: '';
     }
 }
 
-$installer = new Installer;
+if (empty($argv[1])) {
+    \rcube::raise_error('Chrome driver version is a required argument of this script.', false, true);
+}
+
+$installer = new Installer();
 $installer->install($argv[1]);

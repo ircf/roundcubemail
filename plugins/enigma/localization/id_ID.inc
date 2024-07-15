@@ -1,6 +1,6 @@
 <?php
 
-/**
+/*
  +-----------------------------------------------------------------------+
  | Localization file of the Roundcube Webmail Enigma plugin              |
  |                                                                       |
@@ -63,12 +63,14 @@ $labels['keydisable'] = 'Nonaktifkan';
 $labels['keyrevoke'] = 'Cabut';
 $labels['keysend'] = 'Kirim kunci publik dalam pesan';
 $labels['keychpass'] = 'Ubah kata sandi';
+$labels['keyadd'] = 'Tambah kunci';
 $labels['newkeyident'] = 'Identitas';
 $labels['newkeypass'] = 'Password';
 $labels['newkeypassconfirm'] = 'Konfirmasi password / kata kunci';
-$labels['newkeysize'] = 'Ukuran kunci';
-$labels['key2048'] = '2048 bit - baku';
-$labels['key4096'] = '4096 bit - lebih aman';
+$labels['newkeytype'] = 'Tipe kunci';
+$labels['rsa2048'] = 'RSA - 2048 bit';
+$labels['rsa4096'] = 'RSA - 4096 bit';
+$labels['ecckeypair'] = 'ECC (Elliptic Curve)';
 $labels['keygenerating'] = 'Membuat kunci...';
 $labels['encryptionoptions'] = 'Opsi enkripsi...';
 $labels['encryptmsg'] = 'Enkripsikan pesan ini';
@@ -83,6 +85,7 @@ $labels['withprivkeys'] = 'Ekspor Kunci Rahasia';
 $labels['findkey'] = 'Cari pada server kunci';
 $labels['keyimportlabel'] = 'Impor dari berkas';
 $labels['keyimportsearchlabel'] = 'Cari pada server kunci';
+$labels['managekeys'] = 'Kelola kunci PGP';
 $labels['arialabelkeyexportoptions'] = 'Opsi ekspor kunci';
 $messages['sigvalid'] = 'Tanda tangan terverifikasi dari $sender.';
 $messages['sigvalidpartial'] = 'Tanda tangan terverifikasi dari $sender, tapi sebagian pesan tidak ditandatangani.';
@@ -121,4 +124,6 @@ $messages['keygeneratesuccess'] = 'Suatu pasangan kunci dibuat dan sukses diimpo
 $messages['keygennosupport'] = 'Peramban web Anda tidak mendukung kriptografi. Tidak bisa membuat suatu pasangan kunci!';
 $messages['noidentselected'] = 'Anda mesti memilih paling tidak satu identitas untuk kunci!';
 $messages['nonameident'] = 'Identitas mesti mengandung nama pengguna!';
-?>
+$labels['newkeysize'] = 'Ukuran kunci';
+$labels['key2048'] = '2048 bit - baku';
+$labels['key4096'] = '4096 bit - lebih aman';

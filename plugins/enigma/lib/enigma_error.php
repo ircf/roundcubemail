@@ -1,6 +1,6 @@
 <?php
 
-/**
+/*
  +-------------------------------------------------------------------------+
  | Error class for the Enigma Plugin                                       |
  |                                                                         |
@@ -18,39 +18,42 @@ class enigma_error
 {
     private $code;
     private $message;
-    private $data = array();
+    private $data = [];
 
     // error codes
-    const OK          = 0;
-    const INTERNAL    = 1;
-    const NODATA      = 2;
-    const KEYNOTFOUND = 3;
-    const DELKEY      = 4;
-    const BADPASS     = 5;
-    const EXPIRED     = 6;
-    const UNVERIFIED  = 7;
-    const NOMDC       = 8;
+    public const OK = 0;
+    public const INTERNAL = 1;
+    public const NODATA = 2;
+    public const KEYNOTFOUND = 3;
+    public const DELKEY = 4;
+    public const BADPASS = 5;
+    public const EXPIRED = 6;
+    public const UNVERIFIED = 7;
+    public const NOMDC = 8;
 
-
-    function __construct($code = null, $message = '', $data = array())
+    public function __construct($code = null, $message = '', $data = [])
     {
-        $this->code    = $code;
+        $this->code = $code;
         $this->message = $message;
-        $this->data    = $data;
+        $this->data = $data;
     }
 
-    function getCode()
+    public function getCode()
     {
         return $this->code;
     }
 
-    function getMessage()
+    public function getMessage()
     {
         return $this->message;
     }
 
-    function getData($name)
+    public function getData($name = null)
     {
-        return $name ? $this->data[$name] : $this->data;
+        if ($name) {
+            return $this->data[$name] ?? null;
+        }
+
+        return $this->data;
     }
 }

@@ -1,17 +1,20 @@
 <?php
 
-namespace Tests\Browser;
+namespace Roundcube\Tests\Browser\Logon;
 
-use Tests\Browser\Components\App;
+use Roundcube\Tests\Browser\Bootstrap;
+use Roundcube\Tests\Browser\Components\App;
+use Roundcube\Tests\Browser\TestCase;
 
 class LoginTest extends TestCase
 {
-    protected function setUp()
+    #[\Override]
+    protected function setUp(): void
     {
         parent::setUp();
 
-        \bootstrap::init_db();
-        \bootstrap::init_imap();
+        Bootstrap::init_db();
+        Bootstrap::init_imap(true);
     }
 
     public function testLogin()
@@ -23,7 +26,7 @@ class LoginTest extends TestCase
             $browser->assertTitleContains($this->app->config->get('product_name'));
 
             // task should be set to 'login'
-            $browser->with(new App(), function ($browser) {
+            $browser->with(new App(), static function ($browser) {
                 $browser->assertEnv('task', 'login');
             });
 
@@ -45,7 +48,7 @@ class LoginTest extends TestCase
             $browser->go('mail');
 
             // task should be set to 'mail' now
-            $browser->with(new App(), function ($browser) {
+            $browser->with(new App(), static function ($browser) {
                 $browser->assertEnv('task', 'mail');
             });
         });

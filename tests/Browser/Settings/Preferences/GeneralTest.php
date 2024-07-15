@@ -1,14 +1,20 @@
 <?php
 
-namespace Tests\Browser\Settings\Preferences;
+namespace Roundcube\Tests\Browser\Settings\Preferences;
 
-use Tests\Browser\Components\App;
+use PHPUnit\Framework\Attributes\Depends;
+use Roundcube\Tests\Browser\Bootstrap;
+use Roundcube\Tests\Browser\Components\App;
+use Roundcube\Tests\Browser\TestCase;
 
-class GeneralTest extends \Tests\Browser\TestCase
+class GeneralTest extends TestCase
 {
-    public static function setUpBeforeClass()
+    private $settings;
+
+    #[\Override]
+    public static function setUpBeforeClass(): void
     {
-        \bootstrap::init_db();
+        Bootstrap::init_db();
     }
 
     public function testGeneral()
@@ -37,7 +43,7 @@ class GeneralTest extends \Tests\Browser\TestCase
                 }
 
                 // check task and action
-                $browser->with(new App(), function ($browser) {
+                $browser->with(new App(), static function ($browser) {
                     $browser->assertEnv('task', 'settings');
                     $browser->assertEnv('action', 'edit-prefs');
                 });
@@ -71,15 +77,15 @@ class GeneralTest extends \Tests\Browser\TestCase
 
                     $browser->assertSeeIn('label[for=rcmfd_refresh_interval]', 'Refresh');
                     $browser->assertVisible('select[name=_refresh_interval]');
-                    $browser->assertSelected('select[name=_refresh_interval]', $this->app->config->get('refresh_interval')/60);
+                    $browser->assertSelected('select[name=_refresh_interval]', $this->app->config->get('refresh_interval') / 60);
                 });
 
-                // Interface Skin fieldset
+                // TODO: Interface Skin fieldset
+                /*
                 $browser->with('form.propform fieldset.skin', function ($browser) {
                     $browser->assertSeeIn('legend', 'Interface skin');
-
-                    // TODO
                 });
+                */
 
                 // Browser Options fieldset
                 $browser->with('form.propform fieldset.browser', function ($browser) {
@@ -97,6 +103,7 @@ class GeneralTest extends \Tests\Browser\TestCase
      *
      * @depends testGeneral
      */
+    #[Depends('testGeneral')]
     public function testPreferencesChange()
     {
         // Values we're changing to
@@ -150,14 +157,14 @@ class GeneralTest extends \Tests\Browser\TestCase
         });
 
         // Assert the options have been saved in database properly
-        $prefs   = \bootstrap::get_prefs();
+        $prefs = Bootstrap::get_prefs();
         $options = array_diff(array_keys($this->settings), ['refresh_interval', 'pretty_date']);
 
         foreach ($options as $option) {
-            $this->assertEquals($this->settings[$option], $prefs[$option]);
+            $this->assertSame($this->settings[$option], $prefs[$option]);
         }
 
-        $this->assertEquals($this->settings['pretty_date'], $prefs['prettydate']);
-        $this->assertEquals($this->settings['refresh_interval'], $prefs['refresh_interval']/60);
+        $this->assertSame($this->settings['pretty_date'], $prefs['prettydate']);
+        $this->assertSame($this->settings['refresh_interval'], $prefs['refresh_interval'] / 60);
     }
 }

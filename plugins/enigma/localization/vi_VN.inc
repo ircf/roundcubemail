@@ -1,6 +1,6 @@
 <?php
 
-/**
+/*
  +-----------------------------------------------------------------------+
  | Localization file of the Roundcube Webmail Enigma plugin              |
  |                                                                       |
@@ -19,4 +19,3 @@ $labels['subkeycreated'] = 'Được tạo';
 $labels['expiresnever'] = 'không bao giờ';
 $labels['unknown'] = 'Không rõ';
 $labels['newkeypass'] = 'Mật khẩu';
-?>

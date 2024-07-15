@@ -1,6 +1,6 @@
 <?php
 
-/**
+/*
  +-----------------------------------------------------------------------+
  | Localization file of the Roundcube Webmail Enigma plugin              |
  |                                                                       |
@@ -18,4 +18,3 @@ $labels['subkeycreated'] = 'Үүссэн';
 $labels['unknown'] = 'мэдэгдэхгүй';
 $labels['keychpass'] = 'Нууц үг солих';
 $labels['newkeypass'] = 'Нууц үг';
-?>

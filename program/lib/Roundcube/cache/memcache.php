@@ -1,6 +1,6 @@
 <?php
 
-/**
+/*
  +-----------------------------------------------------------------------+
  | This file is part of the Roundcube Webmail client                     |
  |                                                                       |
@@ -20,36 +20,22 @@
 */
 
 /**
- * Interface class for accessing Memcache cache
- *
- * @package    Framework
- * @subpackage Cache
+ * Interface implementation class for accessing Memcache cache
  */
 class rcube_cache_memcache extends rcube_cache
 {
     /**
      * Instance of memcache handler
      *
-     * @var Memcache
+     * @var Memcache|false|null
      */
     protected static $memcache;
 
-
-    /**
-     * Object constructor.
-     *
-     * @param int    $userid User identifier
-     * @param string $prefix Key name prefix
-     * @param string $ttl    Expiration time of memcache/apc items
-     * @param bool   $packed Enables/disabled data serialization.
-     *                       It's possible to disable data serialization if you're sure
-     *                       stored data will be always a safe string
-     */
-    public function __construct($userid, $prefix = '', $ttl = 0, $packed = true)
+    public function __construct($userid, $prefix = '', $ttl = 0, $packed = true, $indexed = false)
     {
-        parent::__construct($userid, $prefix, $ttl, $packed);
+        parent::__construct($userid, $prefix, $ttl, $packed, $indexed);
 
-        $this->type  = 'memcache';
+        $this->type = 'memcache';
         $this->debug = rcube::get_instance()->config->get('memcache_debug');
 
         self::engine();
@@ -58,7 +44,7 @@ class rcube_cache_memcache extends rcube_cache
     /**
      * Get global handle for memcache access
      *
-     * @return object Memcache
+     * @return Memcache|false
      */
     public static function engine()
     {
@@ -70,45 +56,47 @@ class rcube_cache_memcache extends rcube_cache
         if (!class_exists('Memcache')) {
             self::$memcache = false;
 
-            rcube::raise_error(array(
-                    'code' => 604,
-                    'type' => 'memcache',
-                    'line' => __LINE__,
-                    'file' => __FILE__,
-                    'message' => "Failed to find Memcache. Make sure php-memcache is included"
-                ),
-                true, true);
+            rcube::raise_error([
+                'code' => 604,
+                'type' => 'memcache',
+                'line' => __LINE__,
+                'file' => __FILE__,
+                'message' => 'Failed to find Memcache. Make sure php-memcache is included',
+            ], true, true);
         }
 
         // add all configured hosts to pool
         $rcube = rcube::get_instance();
-        $pconnect       = $rcube->config->get('memcache_pconnect', true);
-        $timeout        = $rcube->config->get('memcache_timeout', 1);
+        $pconnect = $rcube->config->get('memcache_pconnect', true);
+        $timeout = $rcube->config->get('memcache_timeout', 1);
         $retry_interval = $rcube->config->get('memcache_retry_interval', 15);
-        $seen           = array();
-        $available      = 0;
+        $seen = [];
+        $available = 0;
 
         // Callback for memcache failure
-        $error_callback = function($host, $port) use ($seen, $available) {
+        $error_callback = static function ($host, $port) use (&$seen, $available) {
             // only report once
-            if (!$seen["$host:$port"]++) {
+            if (!array_key_exists("{$host}:{$port}", $seen)) {
+                $seen["{$host}:{$port}"] = true;
                 $available--;
-                rcube::raise_error(array(
-                        'code' => 604, 'type' => 'memcache',
-                        'line' => __LINE__, 'file' => __FILE__,
-                        'message' => "Memcache failure on host $host:$port"),
-                    true, false);
+
+                rcube::raise_error([
+                    'code' => 604, 'type' => 'memcache',
+                    'line' => __LINE__, 'file' => __FILE__,
+                    'message' => "Memcache failure on host {$host}:{$port}",
+                ], true, false);
             }
         };
 
-        self::$memcache = new Memcache;
+        self::$memcache = new Memcache();
 
         foreach ((array) $rcube->config->get('memcache_hosts') as $host) {
             if (substr($host, 0, 7) != 'unix://') {
-                list($host, $port) = explode(':', $host);
-                if (!$port) $port = 11211;
-            }
-            else {
+                [$host, $port] = explode(':', $host);
+                if (!$port) {
+                    $port = 11211;
+                }
+            } else {
                 $port = 0;
             }
 
@@ -129,6 +117,7 @@ class rcube_cache_memcache extends rcube_cache
     /**
      * Remove cache records older than ttl
      */
+    #[Override]
     public function expunge()
     {
         // No need for GC, entries are expunged automatically
@@ -137,6 +126,7 @@ class rcube_cache_memcache extends rcube_cache
     /**
      * Remove expired records of all caches
      */
+    #[Override]
     public static function gc()
     {
         // No need for GC, entries are expunged automatically
@@ -149,6 +139,7 @@ class rcube_cache_memcache extends rcube_cache
      *
      * @return mixed Cached value
      */
+    #[Override]
     protected function get_item($key)
     {
         if (!self::$memcache) {
@@ -170,18 +161,19 @@ class rcube_cache_memcache extends rcube_cache
      * @param string $key  Cache internal key name
      * @param mixed  $data Serialized cache data
      *
-     * @param boolean True on success, False on failure
+     * @return bool True on success, False on failure
      */
+    #[Override]
     protected function add_item($key, $data)
     {
         if (!self::$memcache) {
             return false;
         }
 
-        $result = self::$memcache->replace($key, $data, MEMCACHE_COMPRESSED, $this->ttl);
+        $result = self::$memcache->replace($key, $data, \MEMCACHE_COMPRESSED, $this->ttl);
 
         if (!$result) {
-            $result = self::$memcache->set($key, $data, MEMCACHE_COMPRESSED, $this->ttl);
+            $result = self::$memcache->set($key, $data, \MEMCACHE_COMPRESSED, $this->ttl);
         }
 
         if ($this->debug) {
@@ -196,8 +188,9 @@ class rcube_cache_memcache extends rcube_cache
      *
      * @param string $key Cache internal key name
      *
-     * @param boolean True on success, False on failure
+     * @return bool True on success, False on failure
      */
+    #[Override]
     protected function delete_item($key)
     {
         if (!self::$memcache) {

@@ -1,6 +1,6 @@
 <?php
 
-/**
+/*
  +-----------------------------------------------------------------------+
  | Localization file of the Roundcube Webmail Enigma plugin              |
  |                                                                       |
@@ -20,4 +20,3 @@ $labels['expiresnever'] = 'qet';
 $labels['unknown'] = 'nenas';
 $labels['keychpass'] = 'Şîfreyê biguherîne';
 $labels['newkeypass'] = 'Nasnav';
-?>

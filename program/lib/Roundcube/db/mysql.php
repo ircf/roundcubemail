@@ -1,6 +1,6 @@
 <?php
 
-/**
+/*
  +-----------------------------------------------------------------------+
  | This file is part of the Roundcube Webmail client                     |
  |                                                                       |
@@ -22,21 +22,11 @@
  * Database independent query interface
  *
  * This is a wrapper for the PHP PDO
- *
- * @package    Framework
- * @subpackage Database
  */
 class rcube_db_mysql extends rcube_db
 {
     public $db_provider = 'mysql';
 
-    /**
-     * Object constructor
-     *
-     * @param string $db_dsnw DSN for read/write operations
-     * @param string $db_dsnr Optional DSN for read only operations
-     * @param bool   $pconn   Enables persistent connections
-     */
     public function __construct($db_dsnw, $db_dsnr = '', $pconn = false)
     {
         parent::__construct($db_dsnw, $db_dsnr, $pconn);
@@ -47,26 +37,14 @@ class rcube_db_mysql extends rcube_db
     }
 
     /**
-     * Driver-specific configuration of database connection
-     *
-     * @param array $dsn DSN for DB connections
-     * @param PDO   $dbh Connection handler
-     */
-    protected function conn_configure($dsn, $dbh)
-    {
-        $dbh->query("SET NAMES 'utf8'");
-    }
-
-    /**
      * Abstract SQL statement for value concatenation
      *
-     * @return string SQL statement to be used in query
+     * @return string ...$args Values to concatenate
      */
-    public function concat(/* col1, col2, ... */)
+    #[Override]
+    public function concat(...$args)
     {
-        $args = func_get_args();
-
-        if (is_array($args[0])) {
+        if (count($args) == 1 && is_array($args[0])) {
             $args = $args[0];
         }
 
@@ -80,34 +58,30 @@ class rcube_db_mysql extends rcube_db
      *
      * @return string Connection string
      */
+    #[Override]
     protected function dsn_string($dsn)
     {
-        $params = array();
-        $result = 'mysql:';
+        $params = [];
 
-        if ($dsn['database']) {
+        if (isset($dsn['database'])) {
             $params[] = 'dbname=' . $dsn['database'];
         }
 
-        if ($dsn['hostspec']) {
+        if (isset($dsn['hostspec'])) {
             $params[] = 'host=' . $dsn['hostspec'];
         }
 
-        if ($dsn['port']) {
+        if (isset($dsn['port'])) {
             $params[] = 'port=' . $dsn['port'];
         }
 
-        if ($dsn['socket']) {
+        if (isset($dsn['socket'])) {
             $params[] = 'unix_socket=' . $dsn['socket'];
         }
 
-        $params[] = 'charset=utf8';
+        $params[] = 'charset=' . (!empty($dsn['charset']) ? $dsn['charset'] : 'utf8mb4');
 
-        if (!empty($params)) {
-            $result .= implode(';', $params);
-        }
-
-        return $result;
+        return 'mysql:' . implode(';', $params);
     }
 
     /**
@@ -117,6 +91,7 @@ class rcube_db_mysql extends rcube_db
      *
      * @return array Connection options
      */
+    #[Override]
     protected function dsn_options($dsn)
     {
         $result = parent::dsn_options($dsn);
@@ -151,6 +126,13 @@ class rcube_db_mysql extends rcube_db
         // Enable AUTOCOMMIT mode (#1488902)
         $result[PDO::ATTR_AUTOCOMMIT] = true;
 
+        // Disable emulating of prepared statements
+        if (isset($dsn['emulate_prepares'])) {
+            $result[PDO::ATTR_EMULATE_PREPARES] = rcube_utils::get_boolean($dsn['emulate_prepares']);
+        } else {
+            $result[PDO::ATTR_EMULATE_PREPARES] = false;
+        }
+
         return $result;
     }
 
@@ -159,15 +141,16 @@ class rcube_db_mysql extends rcube_db
      *
      * @return array List of all tables of the current database
      */
+    #[Override]
     public function list_tables()
     {
         // get tables if not cached
         if ($this->tables === null) {
-            $q = $this->query("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES"
+            $q = $this->query('SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES'
                 . " WHERE TABLE_SCHEMA = ? AND TABLE_TYPE = 'BASE TABLE'"
-                . " ORDER BY TABLE_NAME", $this->db_dsnw_array['database']);
+                . ' ORDER BY TABLE_NAME', $this->db_dsnw_array['database']);
 
-            $this->tables = $q ? $q->fetchAll(PDO::FETCH_COLUMN, 0) : array();
+            $this->tables = $q ? $q->fetchAll(PDO::FETCH_COLUMN, 0) : [];
         }
 
         return $this->tables;
@@ -180,17 +163,18 @@ class rcube_db_mysql extends rcube_db
      *
      * @return array List of table cols
      */
+    #[Override]
     public function list_cols($table)
     {
-        $q = $this->query("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS"
-            . " WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?",
+        $q = $this->query('SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS'
+            . ' WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?',
             $this->db_dsnw_array['database'], $table);
 
         if ($q) {
             return $q->fetchAll(PDO::FETCH_COLUMN, 0);
         }
 
-        return array();
+        return [];
     }
 
     /**
@@ -201,10 +185,11 @@ class rcube_db_mysql extends rcube_db
      *
      * @return mixed Variable value or default
      */
+    #[Override]
     public function get_variable($varname, $default = null)
     {
         if (!isset($this->variables)) {
-            $this->variables = array();
+            $this->variables = [];
         }
 
         if (array_key_exists($varname, $this->variables)) {
@@ -235,52 +220,35 @@ class rcube_db_mysql extends rcube_db
      * INSERT ... ON DUPLICATE KEY UPDATE (or equivalent).
      * When not supported by the engine we do UPDATE and INSERT.
      *
-     * @param string $table   Table name
+     * @param string $table   Table name (should be already passed via table_name() with quoting)
      * @param array  $keys    Hash array (column => value) of the unique constraint
      * @param array  $columns List of columns to update
      * @param array  $values  List of values to update (number of elements
      *                        should be the same as in $columns)
      *
      * @return PDOStatement|bool Query handle or False on error
+     *
      * @todo Multi-insert support
      */
+    #[Override]
     public function insert_or_update($table, $keys, $columns, $values)
     {
-        $table   = $this->table_name($table, true);
-        $columns = array_map(function($i) { return "`$i`"; }, $columns);
-        $cols    = implode(', ', array_map(function($i) { return "`$i`"; }, array_keys($keys)));
-        $cols   .= ', ' . implode(', ', $columns);
-        $vals    = implode(', ', array_map(function($i) { return $this->quote($i); }, $keys));
-        $vals   .= ', ' . rtrim(str_repeat('?, ', count($columns)), ', ');
-        $update  = implode(', ', array_map(function($i) { return "$i = VALUES($i)"; }, $columns));
+        $columns = array_map(static function ($i) {
+            return "`{$i}`";
+        }, $columns);
+        $cols = implode(', ', array_map(static function ($i) {
+            return "`{$i}`";
+        }, array_keys($keys)));
+        $cols .= ', ' . implode(', ', $columns);
+        $vals = implode(', ', array_map(function ($i) {
+            return $this->quote($i);
+        }, $keys));
+        $vals .= ', ' . rtrim(str_repeat('?, ', count($columns)), ', ');
+        $update = implode(', ', array_map(static function ($i) {
+            return "{$i} = VALUES({$i})";
+        }, $columns));
 
-        return $this->query("INSERT INTO $table ($cols) VALUES ($vals)"
-            . " ON DUPLICATE KEY UPDATE $update", $values);
+        return $this->query("INSERT INTO {$table} ({$cols}) VALUES ({$vals})"
+            . " ON DUPLICATE KEY UPDATE {$update}", $values);
     }
-
-    /**
-     * Handle DB errors, re-issue the query on deadlock errors from InnoDB row-level locking
-     *
-     * @param string Query that triggered the error
-     * @return mixed Result to be stored and returned
-     */
-    protected function handle_error($query)
-    {
-        $error = $this->dbh->errorInfo();
-
-        // retry after "Deadlock found when trying to get lock" errors
-        $retries = 2;
-        while ($error[1] == 1213 && $retries >= 0) {
-            usleep(50000);  // wait 50 ms
-            $result = $this->dbh->query($query);
-            if ($result !== false) {
-                return $result;
-            }
-            $error = $this->dbh->errorInfo();
-            $retries--;
-        }
-
-        return parent::handle_error($query);
-    }
-
 }

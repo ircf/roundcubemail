@@ -1,14 +1,17 @@
 <?php
 
-namespace Tests\Browser\Contacts;
+namespace Roundcube\Tests\Browser\Contacts;
 
-use Tests\Browser\Components\App;
+use Roundcube\Tests\Browser\Bootstrap;
+use Roundcube\Tests\Browser\Components\App;
+use Roundcube\Tests\Browser\TestCase;
 
-class PrintTest extends \Tests\Browser\TestCase
+class PrintTest extends TestCase
 {
-    public static function setUpBeforeClass()
+    #[\Override]
+    public static function setUpBeforeClass(): void
     {
-        \bootstrap::init_db();
+        Bootstrap::init_db();
     }
 
     /**
@@ -22,7 +25,7 @@ class PrintTest extends \Tests\Browser\TestCase
             $browser->waitFor('#contacts-table tbody tr:first-child')
                 ->ctrlClick('#contacts-table tbody tr:first-child');
 
-            list($current_window, $new_window) = $browser->openWindow(function ($browser) {
+            [$current_window, $new_window] = $browser->openWindow(function ($browser) {
                 if ($browser->isPhone()) {
                     $this->markTestSkipped();
                 }
@@ -32,10 +35,10 @@ class PrintTest extends \Tests\Browser\TestCase
 
             $browser->driver->switchTo()->window($new_window);
 
-            $browser->with(new App(), function ($browser) {
+            $browser->with(new App(), static function ($browser) {
                 $browser->assertEnv([
-                        'task' => 'addressbook',
-                        'action' => 'print',
+                    'task' => 'addressbook',
+                    'action' => 'print',
                 ]);
             });
 

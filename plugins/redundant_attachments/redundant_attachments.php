@@ -1,6 +1,6 @@
 <?php
 
-/**
+/*
  * Redundant attachments
  *
  * This plugin provides a redundant storage for temporary uploaded
@@ -32,12 +32,12 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-require_once(RCUBE_PLUGINS_DIR . 'filesystem_attachments/filesystem_attachments.php');
+require_once RCUBE_PLUGINS_DIR . 'filesystem_attachments/filesystem_attachments.php';
 
 class redundant_attachments extends filesystem_attachments
 {
     // A prefix for the cache key used in the session and in the key field of the cache table
-    const PREFIX = "ATTACH";
+    public const PREFIX = 'ATTACH';
 
     // rcube_cache instance for SQL DB
     private $cache;
@@ -46,7 +46,6 @@ class redundant_attachments extends filesystem_attachments
     private $mem_cache;
 
     private $loaded;
-
 
     /**
      * Loads plugin configuration and initializes cache object(s)
@@ -62,10 +61,10 @@ class redundant_attachments extends filesystem_attachments
         // load configuration
         $this->load_config();
 
-        $ttl      = 12 * 60 * 60; // 12 hours
-        $ttl      = $rcmail->config->get('redundant_attachments_cache_ttl', $ttl);
+        $ttl = 12 * 60 * 60; // 12 hours
+        $ttl = $rcmail->config->get('redundant_attachments_cache_ttl', $ttl);
         $fallback = $rcmail->config->get('redundant_attachments_fallback');
-        $prefix   = self::PREFIX;
+        $prefix = self::PREFIX;
 
         if ($id = session_id()) {
             $prefix .= $id;
@@ -76,11 +75,11 @@ class redundant_attachments extends filesystem_attachments
         }
 
         // Init SQL cache (disable cache data serialization)
-        $this->cache = $rcmail->get_cache($prefix, 'db', $ttl, false);
+        $this->cache = $rcmail->get_cache($prefix, 'db', $ttl, false, true);
 
         // Init memcache/redis (fallback) cache
         if ($fallback) {
-            $this->mem_cache = $rcmail->get_cache($prefix, $fallback, $ttl, false);
+            $this->mem_cache = $rcmail->get_cache($prefix, $fallback, $ttl, false, true);
         }
 
         $this->loaded = true;
@@ -91,26 +90,28 @@ class redundant_attachments extends filesystem_attachments
      */
     private function _key($args)
     {
-        $uname = $args['path'] ?: $args['name'];
-        return $args['group'] . md5(time() . $uname . $_SESSION['user_id']);
+        $uname = !empty($args['path']) ? $args['path'] : $args['name'];
+
+        return $args['group'] . md5(microtime() . $uname . $_SESSION['user_id']);
     }
 
     /**
      * Save a newly uploaded attachment
      */
-    function upload($args)
+    #[Override]
+    public function upload($args)
     {
         $args = parent::upload($args);
 
         $this->_load_drivers();
 
-        $key  = $this->_key($args);
+        $key = $this->_key($args);
         $data = base64_encode(file_get_contents($args['path']));
 
-        $status = $this->cache->write($key, $data);
+        $status = $this->cache->set($key, $data);
 
         if (!$status && $this->mem_cache) {
-            $status = $this->mem_cache->write($key, $data);
+            $status = $this->mem_cache->set($key, $data);
         }
 
         if ($status) {
@@ -124,23 +125,24 @@ class redundant_attachments extends filesystem_attachments
     /**
      * Save an attachment from a non-upload source (draft or forward)
      */
-    function save($args)
+    #[Override]
+    public function save($args)
     {
         $args = parent::save($args);
 
         $this->_load_drivers();
 
-        $data = $args['path'] ? file_get_contents($args['path']) : $args['data'];
+        $data = !empty($args['path']) ? file_get_contents($args['path']) : $args['data'];
 
         $args['data'] = null;
 
-        $key  = $this->_key($args);
+        $key = $this->_key($args);
         $data = base64_encode($data);
 
-        $status = $this->cache->write($key, $data);
+        $status = $this->cache->set($key, $data);
 
         if (!$status && $this->mem_cache) {
-            $status = $this->mem_cache->write($key, $data);
+            $status = $this->mem_cache->set($key, $data);
         }
 
         if ($status) {
@@ -155,7 +157,8 @@ class redundant_attachments extends filesystem_attachments
      * Remove an attachment from storage
      * This is triggered by the remove attachment button on the compose screen
      */
-    function remove($args)
+    #[Override]
+    public function remove($args)
     {
         parent::remove($args);
 
@@ -179,7 +182,8 @@ class redundant_attachments extends filesystem_attachments
      * For this plugin, $this->get() will check the file and
      * return it's contents
      */
-    function display($args)
+    #[Override]
+    public function display($args)
     {
         return $this->get($args);
     }
@@ -188,22 +192,24 @@ class redundant_attachments extends filesystem_attachments
      * When displaying or sending the attachment the file contents are fetched
      * using this method. This is also called by the attachment_display hook.
      */
-    function get($args)
+    #[Override]
+    public function get($args)
     {
         // attempt to get file from local file system
         $args = parent::get($args);
 
-        if ($args['path'] && ($args['status'] = file_exists($args['path'])))
-          return $args;
+        if (!empty($args['path']) && ($args['status'] = file_exists($args['path']))) {
+            return $args;
+        }
 
         $this->_load_drivers();
 
         // fetch from database if not found on FS
-        $data = $this->cache->read($args['id']);
+        $data = $this->cache->get($args['id']);
 
         // fetch from memcache if not found on FS and DB
         if (($data === false || $data === null) && $this->mem_cache) {
-            $data = $this->mem_cache->read($args['id']);
+            $data = $this->mem_cache->get($args['id']);
         }
 
         if ($data) {
@@ -217,16 +223,19 @@ class redundant_attachments extends filesystem_attachments
     /**
      * Delete all temp files associated with this user
      */
-    function cleanup($args)
+    #[Override]
+    public function cleanup($args)
     {
         $this->_load_drivers();
 
+        $group = $args['group'] ?? null;
+
         if ($this->cache) {
-            $this->cache->remove($args['group'], true);
+            $this->cache->remove($group, true);
         }
 
         if ($this->mem_cache) {
-            $this->mem_cache->remove($args['group'], true);
+            $this->mem_cache->remove($group, true);
         }
 
         parent::cleanup($args);

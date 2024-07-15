@@ -12,7 +12,6 @@ plugins/markasjunk2
 plugins/junk_report
 
 # composer-related
-composer.json
 composer.phar
 composer.lock
 vendor
@@ -24,3 +23,17 @@ program/js/jquery.min.js
 program/js/jstz.min.js
 program/js/publickey.js
 program/js/tinymce/
+
+# eslint dependencies
+/node_modules
+/package.json
+/package-lock.json
+
+# skin customization files
+skins/elastic/styles/_styles.less
+skins/elastic/styles/_variables.less
+
+# ignore IDE files
+.vscode
+.DS_Store
+.idea
